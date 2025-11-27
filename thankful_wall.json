@@ -1,0 +1,15 @@
+{
+  "entries": {
+    "1": {
+      "english_name": "Kevin",
+      "chinese_name": "上",
+      "thankful_for": "Cheese"
+    },
+    "2": {
+      "english_name": "Test",
+      "chinese_name": "Test",
+      "role_class": "Test",
+      "thankful_for": "Test"
+    }
+  }
+}
