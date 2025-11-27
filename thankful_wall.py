@@ -9,8 +9,23 @@ import time
 st.set_page_config(page_title="Thanksgiving Thankful Wall", layout="wide")
 
 # Page header
-st.title("🦃 Thanksgiving Thankful Wall 感恩节感恩墙")
-st.markdown("Share what you're thankful for! 分享你的感恩之心！")
+st.title("🦃 Happy Thanksgiving! 感恩节快乐!🦃")
+st.markdown("""
+This is a special time of the year when we gather to express gratitude for all that we appreciate in life. We may be thankful for:
+在这个一年一度的特别时刻，我们欢聚一堂，感恩生活中值得珍惜的一切。我们感谢的可能是：
+
+- Family and friends 家人和朋友
+- Good health 健康
+- Education opportunities 教育机会
+- Delicious food 美味的食物
+- A warm home 温暖的家
+- Kind teachers 善良的老师
+- Beautiful nature 美丽的大自然
+- Technology 科技
+- Music and art 音乐和艺术
+- A peaceful life 和平的生活
+…and so much more! Let's always remember to cherish what we have. 	……还有很多很多！愿我们始终心怀感恩，珍惜所拥有的一切。
+""")
 
 
 # Initialize Firebase
@@ -129,7 +144,7 @@ if 'success_message' not in st.session_state:
 english_name = st.sidebar.text_input("English Name 英文名", key="english_name")
 chinese_name = st.sidebar.text_input("Chinese Name 中文名", key="chinese_name")
 role_class = st.sidebar.text_input(
-    "Class or Role (e.g., Class A, Teacher, Parent, etc.) 班级或身份 (例如: A班, 老师, 家长等)", key="role_class")
+    "Class or Role (e.g., G10-2, Teacher, Administrator, etc.) 班级或身份 (例如: A班, 老师, 家长等)", key="role_class")
 thankful_for = st.sidebar.text_area("What are you thankful for? 你感恩什么?", key="thankful_for")
 
 # Submit button
@@ -150,10 +165,10 @@ if st.sidebar.button("Submit 提交", type="primary"):
                     st.session_state.success_message = f"""
                     🎉 **Thank you! Your entry has been saved successfully! 谢谢！您的条目已成功保存！**
 
-                    **Details 详情:**
-                    - Name 姓名: {english_name} ({chinese_name})
-                    - Class/Role 班级/身份: {role_class if role_class else 'Not specified 未指定'}
-                    - Thankful for 感恩: {thankful_for}
+                    # **Details 详情:**
+                    # - Name 姓名: {english_name} ({chinese_name})
+                    # - Class/Role 班级/身份: {role_class if role_class else 'Not specified 未指定'}
+                    # - Thankful for 感恩: {thankful_for}
 
                     ⏳ **Please wait a moment for the page to update and show your entry below.**
                     ⏳ **请稍等片刻，页面将更新并在下方显示您的条目。**
