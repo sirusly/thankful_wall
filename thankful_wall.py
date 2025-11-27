@@ -100,7 +100,6 @@ def get_all_entries_sorted():
         entries_ref = db.collection('thankful_entries')
         docs = entries_ref.stream()
         
-        entries = {}
         manual_ordered = []
         auto_ordered = []
         
@@ -109,17 +108,20 @@ def get_all_entries_sorted():
             entry_data['firebase_id'] = doc.id
             
             # Separate entries with manual order from those without
-            if entry_data.get('manual_order'):
+            if entry_data.get('manual_order') is not None:
                 manual_ordered.append((doc.id, entry_data))
             else:
                 auto_ordered.append((doc.id, entry_data))
         
-        # Sort manually ordered entries by their manual_order
+        # Sort manually ordered entries by their manual_order (ascending)
         manual_ordered.sort(key=lambda x: x[1].get('manual_order', 999999))
         
-        # Sort auto entries by Firebase ID in reverse (newest first)
+        # Sort auto entries by timestamp if available, otherwise by Firebase ID
         # Firebase IDs are chronological, so reverse gives newest first
-        auto_ordered.sort(key=lambda x: x[0], reverse=True)
+        auto_ordered.sort(key=lambda x: (
+            x[1].get('timestamp', 0) if x[1].get('timestamp') 
+            else x[0]  # Fallback to Firebase ID if no timestamp
+        ), reverse=True)
         
         # Combine: manual ordered first, then auto ordered (newest first)
         sorted_entries = {}
@@ -141,7 +143,11 @@ def add_single_entry(entry_data):
         entries_ref = db.collection('thankful_entries')
         # Generate a new document ID
         new_doc_ref = entries_ref.document()
+        
+        # Add timestamp and entry_id
         entry_data['entry_id'] = new_doc_ref.id
+        entry_data['timestamp'] = time.time()  # Use Python timestamp
+        
         new_doc_ref.set(entry_data)
         return True
     except Exception as e:
