@@ -4,7 +4,6 @@ from firebase_admin import credentials, firestore
 import json
 import os
 import time
-import random
 
 # Set the page title and layout
 st.set_page_config(page_title="Thanksgiving Thankful Wall", layout="wide")
@@ -44,6 +43,7 @@ This is a special time of the year when we gather to express gratitude for all t
 ……还有很多很多！愿我们始终心怀感恩，珍惜所拥有的一切。
 """)
 
+
 # Initialize Firebase
 def initialize_firebase():
     try:
@@ -62,105 +62,87 @@ def initialize_firebase():
                 "auth_provider_x509_cert_url": st.secrets["firebase"]["auth_provider_x509_cert_url"],
                 "client_x509_cert_url": st.secrets["firebase"]["client_x509_cert_url"]
             }
-            
+
             cred = credentials.Certificate(firebase_config)
             firebase_admin.initialize_app(cred)
-        
+
         return firestore.client()
     except Exception as e:
         st.error(f"Firebase initialization error: {e}")
         return None
 
+
 # Initialize Firebase
 db = initialize_firebase()
+
 
 def get_all_entries():
     """Get all entries from Firestore"""
     if db is None:
         return {}
-    
+
     try:
         entries_ref = db.collection('thankful_entries')
         docs = entries_ref.stream()
-        
+
         entries = {}
         for doc in docs:
             entries[doc.id] = doc.to_dict()
-        
+
         return entries
     except Exception as e:
         st.error(f"Error getting entries: {e}")
         return {}
 
+
 def get_all_entries_sorted():
-    """Get all entries sorted by manual order, then by timestamp (newest first)"""
+    """Get all entries sorted by manual order, then by timestamp"""
     if db is None:
         return {}
-    
+
     try:
         entries_ref = db.collection('thankful_entries')
         docs = entries_ref.stream()
-        
-        manual_ordered = []
-        auto_ordered = []
-        
+
+        entries = {}
         for doc in docs:
             entry_data = doc.to_dict()
-            entry_data['firebase_id'] = doc.id
-            
-            # Separate entries with manual order from those without
-            if entry_data.get('manual_order') is not None:
-                manual_ordered.append((doc.id, entry_data))
-            else:
-                auto_ordered.append((doc.id, entry_data))
-        
-        # Sort manually ordered entries by their manual_order (ascending)
-        manual_ordered.sort(key=lambda x: x[1].get('manual_order', 999999))
-        
-        # Sort auto entries by timestamp if available, otherwise by Firebase ID
-        # Firebase IDs are chronological, so reverse gives newest first
-        auto_ordered.sort(key=lambda x: (
-            x[1].get('timestamp', 0) if x[1].get('timestamp') 
-            else x[0]  # Fallback to Firebase ID if no timestamp
-        ), reverse=True)
-        
-        # Combine: manual ordered first, then auto ordered (newest first)
-        sorted_entries = {}
-        for entry_id, entry_data in manual_ordered + auto_ordered:
-            sorted_entries[entry_id] = entry_data
-        
+            entry_data['firebase_id'] = doc.id  # Store the Firebase document ID
+            entries[doc.id] = entry_data
+
+        # Sort entries: first by manual_order (if exists), then by Firebase ID (chronological)
+        sorted_entries = dict(sorted(entries.items(),
+                                     key=lambda x: (x[1].get('manual_order', 999999), x[0])))
         return sorted_entries
     except Exception as e:
         st.error(f"Error getting sorted entries: {e}")
         return {}
+
 
 def add_single_entry(entry_data):
     """Add a single entry to Firestore"""
     if db is None:
         st.error("Database not connected")
         return False
-    
+
     try:
         entries_ref = db.collection('thankful_entries')
         # Generate a new document ID
         new_doc_ref = entries_ref.document()
-        
-        # Add timestamp and entry_id
         entry_data['entry_id'] = new_doc_ref.id
-        entry_data['timestamp'] = time.time()  # Use Python timestamp
-        
         new_doc_ref.set(entry_data)
         return True
     except Exception as e:
         st.error(f"Error adding entry: {e}")
         return False
 
+
 def delete_entry(entry_id):
     """Delete a specific entry from Firestore"""
     if db is None:
         st.error("Database not connected")
         return False
-    
+
     try:
         db.collection('thankful_entries').document(entry_id).delete()
         return True
@@ -168,12 +150,13 @@ def delete_entry(entry_id):
         st.error(f"Error deleting entry: {e}")
         return False
 
+
 def update_entry_order(entry_id, new_data):
     """Update a specific entry with new data"""
     if db is None:
         st.error("Database not connected")
         return False
-    
+
     try:
         db.collection('thankful_entries').document(entry_id).update(new_data)
         return True
@@ -181,12 +164,13 @@ def update_entry_order(entry_id, new_data):
         st.error(f"Error updating entry: {e}")
         return False
 
+
 def update_entry(entry_id, updated_data):
     """Update an existing entry with new data"""
     if db is None:
         st.error("Database not connected")
         return False
-    
+
     try:
         db.collection('thankful_entries').document(entry_id).update(updated_data)
         return True
@@ -194,12 +178,13 @@ def update_entry(entry_id, updated_data):
         st.error(f"Error updating entry: {e}")
         return False
 
+
 def delete_all_entries():
     """Delete all entries from Firestore"""
     if db is None:
         st.error("Database not connected")
         return False
-    
+
     try:
         entries_ref = db.collection('thankful_entries')
         docs = entries_ref.stream()
@@ -209,6 +194,7 @@ def delete_all_entries():
     except Exception as e:
         st.error(f"Error deleting all entries: {e}")
         return False
+
 
 # Load the current data - USING SORTED ENTRIES
 entries = get_all_entries_sorted()
@@ -223,18 +209,12 @@ if 'success_message' not in st.session_state:
     st.session_state.success_message = ""
 if 'editing_entry' not in st.session_state:
     st.session_state.editing_entry = None
-# Initialize session state for cycling
-if 'current_cycle_index' not in st.session_state:
-    st.session_state.current_cycle_index = 0
-if 'last_refresh' not in st.session_state:
-    st.session_state.last_refresh = time.time()
-if 'cycle_entries' not in st.session_state:
-    st.session_state.cycle_entries = True
 
 # Simple form without clear_on_submit for better control
 english_name = st.sidebar.text_input("English Name 英文名", key="english_name")
 chinese_name = st.sidebar.text_input("Chinese Name 中文名", key="chinese_name")
-role_class = st.sidebar.text_input("Class or Role (e.g., G10-2, Teacher, Administrator, etc.) 班级或身份 (例如: A班, 老师, 家长等)", key="role_class")
+role_class = st.sidebar.text_input(
+    "Class or Role (e.g., G10-2, Teacher, Administrator, etc.) 班级或身份 (例如: A班, 老师, 家长等)", key="role_class")
 thankful_for = st.sidebar.text_area("What are you thankful for? 你感恩什么?", key="thankful_for")
 
 # Submit button
@@ -249,17 +229,17 @@ if st.sidebar.button("Submit 提交", type="primary"):
                     "role_class": role_class if role_class else "Not specified 未指定",
                     "thankful_for": thankful_for
                 }
-                
+
                 if add_single_entry(entry_data):
                     # Set simplified success message
                     st.session_state.success_message = """
                     🎉 **Thank you! Your entry has been saved successfully! 谢谢！您的条目已成功保存！**
-                    
+
                     ⏳ **Please wait a moment for the page to update and show your entry below.**
                     ⏳ **请稍等片刻，页面将更新并在下方显示您的条目。**
                     """
                     st.session_state.submitted = True
-                    
+
                     # Force immediate rerun to show success message and refresh data
                     st.rerun()
                 else:
@@ -270,14 +250,14 @@ if st.sidebar.button("Submit 提交", type="primary"):
 # Display success message if form was submitted
 if st.session_state.submitted and st.session_state.success_message:
     st.sidebar.success(st.session_state.success_message)
-    
+
     # Show a progress bar to indicate waiting time
     progress_bar = st.sidebar.progress(0)
     for i in range(100):
         # Update progress bar
         progress_bar.progress(i + 1)
         time.sleep(0.03)  # 3 second total wait time
-    
+
     # Clear the message and refresh
     st.session_state.submitted = False
     st.session_state.success_message = ""
@@ -297,7 +277,7 @@ else:
     col1, col2, col3 = st.columns(3)
     with col1:
         st.metric("Total Entries 总条目数", len(entries))
-    
+
     # Count teachers - safely handle missing role_class fields
     teachers = 0
     students = 0
@@ -307,117 +287,24 @@ else:
             teachers += 1
         else:
             students += 1
-    
+
     with col2:
         st.metric("Students 学生", students)
     with col3:
         st.metric("Teachers 老师", teachers)
-    
+
     # Check if manual ordering is being used
     has_manual_order = any(entry.get('manual_order') for entry in entries.values())
     if has_manual_order:
         st.subheader(f"All Entries (Manual Order) 所有条目 (手动排序)")
     else:
         st.subheader(f"All Entries (Newest First) 所有条目 (最新优先)")
-    
+
     # Show loading message while entries refresh
     if st.session_state.get('submitted', False):
         st.info("🔄 Loading latest entries... Please wait. 正在加载最新条目... 请稍候。")
-    
-    # --- AUTO-CYCLING FEATURE ---
-    st.sidebar.header("Display Settings 显示设置")
-    
-    # Toggle for cycling
-    cycle_enabled = st.sidebar.toggle("Enable Auto-Cycling 启用自动轮播", value=st.session_state.cycle_entries)
-    
-    if cycle_enabled != st.session_state.cycle_entries:
-        st.session_state.cycle_entries = cycle_enabled
-        st.session_state.current_cycle_index = 0
-        st.rerun()
-    
-    if cycle_enabled:
-        # Cycling controls
-        cycle_speed = st.sidebar.slider("Cycle Speed (seconds) 轮播速度 (秒)", 3, 30, 10)
-        
-        # Convert entries to list for cycling
-        entries_list = list(entries.items())
-        
-        # Check if it's time to cycle to the next entry
-        current_time = time.time()
-        if current_time - st.session_state.last_refresh > cycle_speed:
-            st.session_state.current_cycle_index = (st.session_state.current_cycle_index + 1) % len(entries_list)
-            st.session_state.last_refresh = current_time
-            st.rerun()
-        
-        # Display current cycling entry with special styling
-        if entries_list:
-            current_entry_id, current_info = entries_list[st.session_state.current_cycle_index]
-            
-            # Create a highlighted container for the cycling entry
-            with st.container():
-                st.markdown("""
-                <style>
-                .cycling-entry {
-                    border: 3px solid #FF6B00;
-                    border-radius: 10px;
-                    padding: 20px;
-                    margin: 10px 0;
-                    background: linear-gradient(135deg, #FFF3E0, #FFE0B2);
-                    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-                    animation: pulse 2s infinite;
-                }
-                @keyframes pulse {
-                    0% { box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-                    50% { box-shadow: 0 6px 12px rgba(255,107,0,0.3); }
-                    100% { box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-                }
-                </style>
-                """, unsafe_allow_html=True)
-                
-                st.markdown(f'<div class="cycling-entry">', unsafe_allow_html=True)
-                
-                st.markdown(f"### 🎯 Currently Displaying 当前展示 ({st.session_state.current_cycle_index + 1}/{len(entries_list)})")
-                
-                col1, col2, col3 = st.columns([1, 1, 2])
-                with col1:
-                    st.write(f"**English Name:** {current_info['english_name']}")
-                with col2:
-                    st.write(f"**Chinese Name:** {current_info['chinese_name']}")
-                with col3:
-                    role_class = current_info.get('role_class', 'Not specified 未指定')
-                    st.write(f"**Class/Role:** {role_class}")
-                
-                st.write(f"**Thankful For:** {current_info['thankful_for']}")
-                
-                # Show manual order if it exists
-                if current_info.get('manual_order'):
-                    st.caption(f"Position: {current_info['manual_order']} • 位置: {current_info['manual_order']} • Entry ID: {current_entry_id[:8]}...")
-                else:
-                    st.caption(f"Entry ID: {current_entry_id[:8]}... • 条目ID: {current_entry_id[:8]}...")
-                
-                st.markdown('</div>', unsafe_allow_html=True)
-                
-                # Progress bar for cycling
-                progress = ((current_time - st.session_state.last_refresh) / cycle_speed)
-                st.progress(progress, text=f"Next entry in {cycle_speed - int(current_time - st.session_state.last_refresh)} seconds 下一条目 {cycle_speed - int(current_time - st.session_state.last_refresh)} 秒后")
-                
-                # Manual navigation
-                col_nav1, col_nav2, col_nav3 = st.columns([1, 2, 1])
-                with col_nav1:
-                    if st.button("⏮️ Previous 上一条", key="prev_cycle"):
-                        st.session_state.current_cycle_index = (st.session_state.current_cycle_index - 1) % len(entries_list)
-                        st.session_state.last_refresh = current_time
-                        st.rerun()
-                with col_nav3:
-                    if st.button("Next 下一条 ⏭️", key="next_cycle"):
-                        st.session_state.current_cycle_index = (st.session_state.current_cycle_index + 1) % len(entries_list)
-                        st.session_state.last_refresh = current_time
-                        st.rerun()
-                
-                st.divider()
-                st.subheader("All Entries 所有条目")
-    
-    # Display all entries in the sorted order (already sorted by get_all_entries_sorted)
+
+    # Display entries in the sorted order (already sorted by get_all_entries_sorted)
     for entry_id, info in entries.items():
         with st.container():
             # Create a nice card-like display
@@ -430,12 +317,13 @@ else:
                 # Safely handle missing role_class field
                 role_class = info.get('role_class', 'Not specified 未指定')
                 st.write(f"**Class/Role:** {role_class}")
-            
+
             st.write(f"**Thankful For:** {info['thankful_for']}")
-            
+
             # Show manual order if it exists
             if info.get('manual_order'):
-                st.caption(f"Position: {info['manual_order']} • 位置: {info['manual_order']} • Entry ID: {entry_id[:8]}...")
+                st.caption(
+                    f"Position: {info['manual_order']} • 位置: {info['manual_order']} • Entry ID: {entry_id[:8]}...")
             else:
                 st.caption(f"Entry ID: {entry_id[:8]}... • 条目ID: {entry_id[:8]}...")
             st.divider()
@@ -446,51 +334,51 @@ admin_password = st.sidebar.text_input("Password 密码", type="password", key="
 
 if admin_password == "))$%17k60ZCS":  # Updated password check
     st.sidebar.success("🔓 Access Granted 访问批准")
-    
+
     # Edit Entry Section
     st.sidebar.subheader("Edit Entry 编辑条目")
-    
+
     if entries:
         # Create a dropdown of all entries for editing
         edit_entry_options = {}
         for entry_id, info in entries.items():
             role_class = info.get('role_class', 'Not specified')
             edit_entry_options[f"ID {entry_id[:8]}: {info['english_name']} - {role_class}"] = entry_id
-        
+
         selected_edit_entry = st.sidebar.selectbox(
             "Select entry to edit 选择要编辑的条目",
             [""] + list(edit_entry_options.keys()),
             key="edit_select"
         )
-        
+
         if selected_edit_entry:
             entry_id_to_edit = edit_entry_options[selected_edit_entry]
             entry_to_edit = entries[entry_id_to_edit]
-            
+
             # Pre-fill form with existing data
             st.sidebar.write("**Edit Entry Details 编辑条目详情:**")
-            
+
             edit_english_name = st.sidebar.text_input(
-                "English Name 英文名", 
+                "English Name 英文名",
                 value=entry_to_edit['english_name'],
                 key="edit_english_name"
             )
             edit_chinese_name = st.sidebar.text_input(
-                "Chinese Name 中文名", 
+                "Chinese Name 中文名",
                 value=entry_to_edit['chinese_name'],
                 key="edit_chinese_name"
             )
             edit_role_class = st.sidebar.text_input(
-                "Class or Role 班级或身份", 
+                "Class or Role 班级或身份",
                 value=entry_to_edit.get('role_class', ''),
                 key="edit_role_class"
             )
             edit_thankful_for = st.sidebar.text_area(
-                "What are you thankful for? 你感恩什么?", 
+                "What are you thankful for? 你感恩什么?",
                 value=entry_to_edit['thankful_for'],
                 key="edit_thankful_for"
             )
-            
+
             if st.sidebar.button("Update Entry 更新条目", key="update_btn"):
                 if edit_english_name and edit_chinese_name and edit_thankful_for:
                     with st.sidebar:
@@ -501,7 +389,7 @@ if admin_password == "))$%17k60ZCS":  # Updated password check
                                 "role_class": edit_role_class if edit_role_class else "Not specified 未指定",
                                 "thankful_for": edit_thankful_for
                             }
-                            
+
                             if update_entry(entry_id_to_edit, updated_data):
                                 st.sidebar.success("✅ Entry updated successfully! 条目更新成功!")
                                 time.sleep(2)
@@ -510,102 +398,92 @@ if admin_password == "))$%17k60ZCS":  # Updated password check
                                 st.sidebar.error("❌ Failed to update entry. 更新条目失败。")
                 else:
                     st.sidebar.error("❌ Please fill in all required fields. 请填写所有必填字段。")
-    
+
     else:
         st.sidebar.info("No entries to edit 没有可编辑的条目")
-    
-    # Reorder Entries Section - FIXED VERSION
+
+    # Reorder Entries Section - UPDATED WITH DRAG-AND-DROP STYLE (OPTION 2)
     st.sidebar.subheader("Reorder Entries 重新排序条目")
-    
+
     if entries:
-        st.sidebar.write("Select entries to feature at the top 选择置顶条目:")
-        
+        st.sidebar.write("Drag-and-Drop Reorder 拖拽重新排序:")
+
         # Get current order
         current_order = list(entries.items())
-        
+
         # Initialize new order in session state if not exists
         if 'new_order' not in st.session_state:
-            st.session_state.new_order = []
-        
-        # Feature specific entries at the top
-        st.sidebar.write("**Feature entries at top 置顶条目:**")
-        
-        # Create a list of available entries (excluding already selected ones)
-        available_entries = [entry for entry in current_order if entry[0] not in [e[0] for e in st.session_state.new_order]]
-        
-        if available_entries:
-            entry_options = {f"{info['english_name']} ({info['chinese_name']})": (entry_id, info) 
-                            for entry_id, info in available_entries}
-            
-            selected_feature = st.sidebar.selectbox(
-                "Select entry to feature 选择要置顶的条目",
-                [""] + list(entry_options.keys()),
-                key="feature_select"
-            )
-            
-            if selected_feature and st.sidebar.button("Add to Featured 添加到置顶", key="add_featured"):
-                selected_id, selected_info = entry_options[selected_feature]
-                st.session_state.new_order.append((selected_id, selected_info))
-                st.sidebar.success(f"Added {selected_info['english_name']} to featured! 已添加{selected_info['english_name']}到置顶!")
-                st.rerun()
-        
-        # Show current featured entries
-        if st.session_state.new_order:
-            st.sidebar.write("**Currently Featured 当前置顶:**")
-            for i, (entry_id, info) in enumerate(st.session_state.new_order, 1):
-                st.sidebar.write(f"{i}. {info['english_name']} ({info['chinese_name']})")
-                
-                # Remove button for each featured entry
-                if st.sidebar.button(f"Remove 移除", key=f"remove_{entry_id}"):
-                    st.session_state.new_order = [entry for entry in st.session_state.new_order if entry[0] != entry_id]
-                    st.rerun()
+            st.session_state.new_order = current_order.copy()
+
+        # Create reorder interface
+        st.sidebar.write("Select new order from top to bottom 从上到下选择新顺序:")
+
+        # Create a list to track used entries
+        used_entries = []
+
+        for position in range(len(current_order)):
+            available_entries = [entry for entry in current_order if entry[0] not in used_entries]
+
+            if available_entries:
+                # Create options for this position
+                entry_options = {f"{info['english_name']} ({info['chinese_name']})": (entry_id, info)
+                                 for entry_id, info in available_entries}
+
+                # Get current selection for this position
+                current_selection = st.session_state.new_order[position] if position < len(
+                    st.session_state.new_order) else available_entries[0]
+                current_display = f"{current_selection[1]['english_name']} ({current_selection[1]['chinese_name']})"
+
+                selected = st.sidebar.selectbox(
+                    f"Position {position + 1} 位置 {position + 1}",
+                    list(entry_options.keys()),
+                    index=list(entry_options.keys()).index(current_display) if current_display in entry_options else 0,
+                    key=f"pos_{position}"
+                )
+
+                if selected:
+                    selected_id, selected_info = entry_options[selected]
+                    # Update the new order
+                    st.session_state.new_order[position] = (selected_id, selected_info)
+                    used_entries.append(selected_id)
 
         # Apply new order button
-        if st.session_state.new_order and st.sidebar.button("Apply Featured Order 应用置顶顺序", key="apply_order"):
+        if st.sidebar.button("Apply New Order 应用新顺序", key="apply_order"):
             with st.sidebar:
                 with st.spinner("Updating order... 正在更新顺序..."):
-                    # FIRST: Clear ALL manual orders to start fresh
-                    clear_success_count = 0
-                    for entry_id in entries.keys():
-                        if update_entry_order(entry_id, {'manual_order': firestore.DELETE_FIELD}):
-                            clear_success_count += 1
-                    
-                    # THEN: Only set manual orders for the entries we actually want to feature
                     success_count = 0
-                    for position, (entry_id, info) in enumerate(st.session_state.new_order, 1):
-                        if update_entry_order(entry_id, {'manual_order': position}):
+                    for new_position, (entry_id, info) in enumerate(st.session_state.new_order, 1):
+                        if update_entry_order(entry_id, {'manual_order': new_position}):
                             success_count += 1
-                    
-                    if success_count > 0:
-                        st.success(f"✅ {success_count} entries featured at top! {success_count}个条目已置顶!")
-                        # Clear the session state
-                        st.session_state.new_order = []
+
+                    if success_count == len(st.session_state.new_order):
+                        st.success("✅ Order updated successfully! 顺序更新成功!")
                         time.sleep(2)
                         st.rerun()
                     else:
-                        st.error("❌ Failed to update featured entries. 置顶条目更新失败。")
-        
-        # Reset ALL orders button
-        if st.sidebar.button("Reset ALL to Default Order 重置所有为默认顺序", key="reset_order"):
+                        st.error("❌ Some entries failed to update. 部分条目更新失败。")
+
+        # Reset order button
+        if st.sidebar.button("Reset to Default Order 重置为默认顺序", key="reset_order"):
             with st.sidebar:
-                with st.spinner("Resetting all orders... 正在重置所有顺序..."):
+                with st.spinner("Resetting order... 正在重置顺序..."):
                     success_count = 0
                     for entry_id in entries.keys():
-                        # Use DELETE_FIELD to remove the manual_order field from ALL entries
+                        # Use DELETE_FIELD to remove the manual_order field
                         if update_entry_order(entry_id, {'manual_order': firestore.DELETE_FIELD}):
                             success_count += 1
-                    
+
                     # Clear the new order from session state
                     if 'new_order' in st.session_state:
-                        st.session_state.new_order = []
-                    
-                    st.sidebar.success(f"✅ All {success_count} entries reset to default order! 所有{success_count}个条目已重置为默认顺序!")
+                        del st.session_state.new_order
+
+                    st.sidebar.success(f"✅ Order reset for {success_count} entries! 已重置{success_count}个条目的顺序!")
                     time.sleep(2)
                     st.rerun()
-    
+
     else:
         st.sidebar.info("No entries to reorder 没有可重新排序的条目")
-    
+
     # Individual entry deletion
     st.sidebar.subheader("Delete Specific Entry 删除特定条目")
     if entries:
@@ -617,40 +495,41 @@ if admin_password == "))$%17k60ZCS":  # Updated password check
             # Show shortened ID for better display
             short_id = entry_id[:8] + "..."
             entry_options[f"ID {short_id}: {info['english_name']} - {role_class}"] = entry_id
-        
+
         selected_entry = st.sidebar.selectbox(
             "Select entry to delete 选择要删除的条目",
             [""] + list(entry_options.keys()),
             key="delete_select"
         )
-        
+
         if selected_entry and st.sidebar.button("Delete Selected Entry 删除选定条目", key="delete_btn"):
             entry_id_to_delete = entry_options[selected_entry]
             # Store the entry info before deleting for confirmation message
             deleted_entry = entries[entry_id_to_delete]
-            
+
             with st.sidebar:
                 with st.spinner("Deleting entry... 正在删除条目..."):
                     if delete_entry(entry_id_to_delete):
                         # Show deletion confirmation
-                        st.sidebar.error(f"🗑️ Deleted: {deleted_entry['english_name']} ({deleted_entry['chinese_name']}) 已删除!")
+                        st.sidebar.error(
+                            f"🗑️ Deleted: {deleted_entry['english_name']} ({deleted_entry['chinese_name']}) 已删除!")
                         time.sleep(2)
                         st.rerun()
     else:
         st.sidebar.info("No entries to delete 没有可删除的条目")
-    
+
     # Delete all entries with confirmation
     st.sidebar.subheader("Delete All Entries 删除所有条目")
-    
+
     if st.sidebar.button("Show Delete All Options 显示删除所有选项", key="delete_all_btn"):
         st.sidebar.warning("⚠️ This will delete ALL entries! 这将删除所有条目!")
-        
+
         # Double confirmation for delete all
         confirm_text = st.sidebar.text_input(
             "Type 'DELETE ALL' to confirm 输入 'DELETE ALL' 确认",
             key="delete_confirm"
         )
-        
+
         if confirm_text == "DELETE ALL":
             if st.sidebar.button("🚨 CONFIRM DELETE ALL 确认删除所有", type="primary", key="confirm_delete_all"):
                 with st.sidebar:
@@ -661,7 +540,7 @@ if admin_password == "))$%17k60ZCS":  # Updated password check
                             st.rerun()
         elif confirm_text and confirm_text != "DELETE ALL":
             st.sidebar.error("Incorrect confirmation text 确认文本不正确")
-    
+
 else:
     if admin_password:
         st.sidebar.error("❌ Incorrect Password 密码错误")
@@ -677,7 +556,6 @@ st.markdown("""
 - **Streamlit** - Creating web applications
 - **JSON file handling** - Data persistence
 - **Firebase Firestore** - Cloud database integration
-- **Auto-cycling animations** - Dynamic content display
 """)
 
 # Add a refresh button for good measure
