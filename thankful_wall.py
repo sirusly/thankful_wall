@@ -26,8 +26,11 @@ This is a special time of the year when we gather to express gratitude for all t
 - Technology 科技
 - Music and art 音乐和艺术
 - A peaceful life 和平的生活
-…and so much more! Let's always remember to cherish what we have. 	……还有很多很多！愿我们始终心怀感恩，珍惜所拥有的一切。
+…and so much more! Let's always remember to cherish what we have. 	
+……还有很多很多！愿我们始终心怀感恩，珍惜所拥有的一切。
 """)
+# Add the smaller message about Python
+st.caption("This application was created entirely with Python! 这个应用程序完全使用Python创建!")
 
 # Initialize Firebase
 def initialize_firebase():
@@ -336,11 +339,11 @@ if st.button("🔄 Refresh Page 刷新页面", key="refresh_btn"):
         st.rerun()
 
 # Information about data persistence
-st.sidebar.markdown("---")
-st.sidebar.info("""
-**About Data Storage 关于数据存储:**
-All entries are stored securely in Google Firebase Firestore. 
-Your data will persist even when the app is updated.
-所有条目都安全地存储在 Google Firebase Firestore 中。
-即使应用更新，您的数据也会保留。
-""")
+# st.sidebar.markdown("---")
+# st.sidebar.info("""
+# **About Data Storage 关于数据存储:**
+# All entries are stored securely in Google Firebase Firestore. 
+# Your data will persist even when the app is updated.
+# 所有条目都安全地存储在 Google Firebase Firestore 中。
+# 即使应用更新，您的数据也会保留。
+# """)
