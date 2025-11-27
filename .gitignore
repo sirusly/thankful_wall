@@ -1,0 +1,22 @@
+# Streamlit secrets - VERY IMPORTANT!
+.streamlit/secrets.toml
+
+# Firebase service account keys
+*.json
+service-account-key*.json
+
+# Python cache files
+__pycache__/
+*.py[cod]
+
+# Environment variables
+.env
+.env.local
+
+# System files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
