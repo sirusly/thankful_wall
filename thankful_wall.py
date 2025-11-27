@@ -320,7 +320,7 @@ else:
 st.sidebar.header("Admin Section 管理员部分")
 admin_password = st.sidebar.text_input("Password 密码", type="password", key="admin_pass")
 
-if admin_password == "admin":  # Simple password check
+if admin_password == "))$%17k60ZCS":  # Updated password check
     st.sidebar.success("🔓 Access Granted 访问批准")
     
     # Edit Entry Section
@@ -390,64 +390,61 @@ if admin_password == "admin":  # Simple password check
     else:
         st.sidebar.info("No entries to edit 没有可编辑的条目")
     
-    # Reorder Entries Section - UPDATED WITH OPTION 1
+    # Reorder Entries Section - UPDATED WITH DRAG-AND-DROP STYLE (OPTION 2)
     st.sidebar.subheader("Reorder Entries 重新排序条目")
     
     if entries:
-        st.sidebar.write("Set the display order 设置显示顺序:")
+        st.sidebar.write("Drag-and-Drop Reorder 拖拽重新排序:")
         
-        # Get current order information
-        sorted_entries = get_all_entries_sorted()
-        entry_list = list(sorted_entries.items())
+        # Get current order
+        current_order = list(entries.items())
         
-        # Create a list of entries for the reorder interface
-        entry_options = []
-        for entry_id, info in entry_list:
-            display_text = f"{info['english_name']} ({info['chinese_name']}) - {info.get('thankful_for', '')[:30]}..."
-            entry_options.append((entry_id, display_text, info.get('manual_order')))
+        # Initialize new order in session state if not exists
+        if 'new_order' not in st.session_state:
+            st.session_state.new_order = current_order.copy()
         
-        # Display current order
-        st.sidebar.write("**Current Order 当前顺序:**")
-        for i, (entry_id, display_text, manual_order) in enumerate(entry_options, 1):
-            order_indicator = f" [Position {manual_order}]" if manual_order else ""
-            st.sidebar.write(f"{i}. {display_text}{order_indicator}")
+        # Create reorder interface
+        st.sidebar.write("Select new order from top to bottom 从上到下选择新顺序:")
         
-        # NEW: Improved reorder interface with individual number inputs
-        st.sidebar.write("**Set New Order 设置新顺序:**")
+        # Create a list to track used entries
+        used_entries = []
         
-        # Create a expander to keep it organized
-        with st.sidebar.expander("Set Positions 设置位置", expanded=True):
-            # Create a dictionary to store new positions
-            new_positions = {}
+        for position in range(len(current_order)):
+            available_entries = [entry for entry in current_order if entry[0] not in used_entries]
             
-            for entry_id, info in entries.items():
-                display_text = f"{info['english_name']} ({info['chinese_name']})"
-                current_pos = info.get('manual_order', 'Auto')
+            if available_entries:
+                # Create options for this position
+                entry_options = {f"{info['english_name']} ({info['chinese_name']})": (entry_id, info) 
+                                for entry_id, info in available_entries}
                 
-                col1, col2 = st.columns([3, 1])
-                with col1:
-                    st.write(f"**{display_text}**")
-                    st.caption(f"Current: {current_pos} • 当前: {current_pos}")
-                with col2:
-                    new_position = st.number_input(
-                        "Position 位置",
-                        min_value=1,
-                        max_value=len(entries),
-                        value=current_pos if current_pos != 'Auto' else len(entries),
-                        key=f"order_{entry_id}",
-                        label_visibility="collapsed"
-                    )
-                    new_positions[entry_id] = new_position
+                # Get current selection for this position
+                current_selection = st.session_state.new_order[position] if position < len(st.session_state.new_order) else available_entries[0]
+                current_display = f"{current_selection[1]['english_name']} ({current_selection[1]['chinese_name']})"
+                
+                selected = st.sidebar.selectbox(
+                    f"Position {position + 1} 位置 {position + 1}",
+                    list(entry_options.keys()),
+                    index=list(entry_options.keys()).index(current_display) if current_display in entry_options else 0,
+                    key=f"pos_{position}"
+                )
+                
+                if selected:
+                    selected_id, selected_info = entry_options[selected]
+                    # Update the new order
+                    st.session_state.new_order[position] = (selected_id, selected_info)
+                    used_entries.append(selected_id)
 
-            if st.button("Apply New Order 应用新顺序", key="apply_order"):
+        # Apply new order button
+        if st.sidebar.button("Apply New Order 应用新顺序", key="apply_order"):
+            with st.sidebar:
                 with st.spinner("Updating order... 正在更新顺序..."):
                     success_count = 0
-                    for entry_id, new_position in new_positions.items():
+                    for new_position, (entry_id, info) in enumerate(st.session_state.new_order, 1):
                         if update_entry_order(entry_id, {'manual_order': new_position}):
                             success_count += 1
                     
-                    if success_count == len(new_positions):
-                        st.success(f"✅ Order updated for {success_count} entries! 已更新{success_count}个条目的顺序!")
+                    if success_count == len(st.session_state.new_order):
+                        st.success("✅ Order updated successfully! 顺序更新成功!")
                         time.sleep(2)
                         st.rerun()
                     else:
@@ -462,6 +459,10 @@ if admin_password == "admin":  # Simple password check
                         # Use DELETE_FIELD to remove the manual_order field
                         if update_entry_order(entry_id, {'manual_order': firestore.DELETE_FIELD}):
                             success_count += 1
+                    
+                    # Clear the new order from session state
+                    if 'new_order' in st.session_state:
+                        del st.session_state.new_order
                     
                     st.sidebar.success(f"✅ Order reset for {success_count} entries! 已重置{success_count}个条目的顺序!")
                     time.sleep(2)
