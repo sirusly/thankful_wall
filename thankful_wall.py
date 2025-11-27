@@ -91,6 +91,29 @@ def get_all_entries():
         st.error(f"Error getting entries: {e}")
         return {}
 
+def get_all_entries_sorted():
+    """Get all entries sorted by manual order, then by timestamp"""
+    if db is None:
+        return {}
+    
+    try:
+        entries_ref = db.collection('thankful_entries')
+        docs = entries_ref.stream()
+        
+        entries = {}
+        for doc in docs:
+            entry_data = doc.to_dict()
+            entry_data['firebase_id'] = doc.id  # Store the Firebase document ID
+            entries[doc.id] = entry_data
+        
+        # Sort entries: first by manual_order (if exists), then by Firebase ID (chronological)
+        sorted_entries = dict(sorted(entries.items(), 
+                                   key=lambda x: (x[1].get('manual_order', 999999), x[0])))
+        return sorted_entries
+    except Exception as e:
+        st.error(f"Error getting sorted entries: {e}")
+        return {}
+
 def add_single_entry(entry_data):
     """Add a single entry to Firestore"""
     if db is None:
@@ -121,6 +144,32 @@ def delete_entry(entry_id):
         st.error(f"Error deleting entry: {e}")
         return False
 
+def update_entry_order(entry_id, new_data):
+    """Update a specific entry with new data"""
+    if db is None:
+        st.error("Database not connected")
+        return False
+    
+    try:
+        db.collection('thankful_entries').document(entry_id).update(new_data)
+        return True
+    except Exception as e:
+        st.error(f"Error updating entry: {e}")
+        return False
+
+def update_entry(entry_id, updated_data):
+    """Update an existing entry with new data"""
+    if db is None:
+        st.error("Database not connected")
+        return False
+    
+    try:
+        db.collection('thankful_entries').document(entry_id).update(updated_data)
+        return True
+    except Exception as e:
+        st.error(f"Error updating entry: {e}")
+        return False
+
 def delete_all_entries():
     """Delete all entries from Firestore"""
     if db is None:
@@ -137,8 +186,8 @@ def delete_all_entries():
         st.error(f"Error deleting all entries: {e}")
         return False
 
-# Load the current data
-entries = get_all_entries()
+# Load the current data - USING SORTED ENTRIES
+entries = get_all_entries_sorted()
 
 # --- Sidebar for Adding New Entries ---
 st.sidebar.header("Add Your Gratitude 添加感恩")
@@ -148,6 +197,8 @@ if 'submitted' not in st.session_state:
     st.session_state.submitted = False
 if 'success_message' not in st.session_state:
     st.session_state.success_message = ""
+if 'editing_entry' not in st.session_state:
+    st.session_state.editing_entry = None
 
 # Simple form without clear_on_submit for better control
 english_name = st.sidebar.text_input("English Name 英文名", key="english_name")
@@ -204,8 +255,8 @@ if st.session_state.submitted and st.session_state.success_message:
 # --- Main Area: Display the Thankful Wall ---
 st.header("Our Thankful Wall - 👇Scroll down to view 👇我们的感恩墙 - 向下滚动查看 👇")
 
-# Refresh entries data
-entries = get_all_entries()
+# Refresh entries data - USING SORTED ENTRIES
+entries = get_all_entries_sorted()
 
 # Display all entries
 if not entries:
@@ -231,20 +282,19 @@ else:
     with col3:
         st.metric("Teachers 老师", teachers)
     
-    # Display entries with the newest first
-    st.subheader(f"All Entries (Newest First) 所有条目 (最新优先)")
+    # Check if manual ordering is being used
+    has_manual_order = any(entry.get('manual_order') for entry in entries.values())
+    if has_manual_order:
+        st.subheader(f"All Entries (Manual Order) 所有条目 (手动排序)")
+    else:
+        st.subheader(f"All Entries (Newest First) 所有条目 (最新优先)")
     
     # Show loading message while entries refresh
     if st.session_state.get('submitted', False):
         st.info("🔄 Loading latest entries... Please wait. 正在加载最新条目... 请稍候。")
     
-    # Convert to list and reverse for newest first (Firestore orders by creation time)
-    entries_list = list(entries.items())
-    if entries_list:
-        # Sort by document ID (newest first) - Firebase creates chronological IDs
-        entries_list.sort(key=lambda x: x[0], reverse=True)
-    
-    for entry_id, info in entries_list:
+    # Display entries in the sorted order (already sorted by get_all_entries_sorted)
+    for entry_id, info in entries.items():
         with st.container():
             # Create a nice card-like display
             col1, col2, col3 = st.columns([1, 1, 2])
@@ -259,8 +309,11 @@ else:
             
             st.write(f"**Thankful For:** {info['thankful_for']}")
             
-            # Show entry ID and timestamp-like info
-            st.caption(f"Entry ID: {entry_id[:8]}... • 条目ID: {entry_id[:8]}...")
+            # Show manual order if it exists
+            if info.get('manual_order'):
+                st.caption(f"Position: {info['manual_order']} • 位置: {info['manual_order']} • Entry ID: {entry_id[:8]}...")
+            else:
+                st.caption(f"Entry ID: {entry_id[:8]}... • 条目ID: {entry_id[:8]}...")
             st.divider()
 
 # --- Admin Section in the Sidebar ---
@@ -269,6 +322,143 @@ admin_password = st.sidebar.text_input("Password 密码", type="password", key="
 
 if admin_password == "admin":  # Simple password check
     st.sidebar.success("🔓 Access Granted 访问批准")
+    
+    # NEW: Edit Entry Section
+    st.sidebar.subheader("Edit Entry 编辑条目")
+    
+    if entries:
+        # Create a dropdown of all entries for editing
+        edit_entry_options = {}
+        for entry_id, info in entries.items():
+            role_class = info.get('role_class', 'Not specified')
+            edit_entry_options[f"ID {entry_id[:8]}: {info['english_name']} - {role_class}"] = entry_id
+        
+        selected_edit_entry = st.sidebar.selectbox(
+            "Select entry to edit 选择要编辑的条目",
+            [""] + list(edit_entry_options.keys()),
+            key="edit_select"
+        )
+        
+        if selected_edit_entry:
+            entry_id_to_edit = edit_entry_options[selected_edit_entry]
+            entry_to_edit = entries[entry_id_to_edit]
+            
+            # Pre-fill form with existing data
+            st.sidebar.write("**Edit Entry Details 编辑条目详情:**")
+            
+            edit_english_name = st.sidebar.text_input(
+                "English Name 英文名", 
+                value=entry_to_edit['english_name'],
+                key="edit_english_name"
+            )
+            edit_chinese_name = st.sidebar.text_input(
+                "Chinese Name 中文名", 
+                value=entry_to_edit['chinese_name'],
+                key="edit_chinese_name"
+            )
+            edit_role_class = st.sidebar.text_input(
+                "Class or Role 班级或身份", 
+                value=entry_to_edit.get('role_class', ''),
+                key="edit_role_class"
+            )
+            edit_thankful_for = st.sidebar.text_area(
+                "What are you thankful for? 你感恩什么?", 
+                value=entry_to_edit['thankful_for'],
+                key="edit_thankful_for"
+            )
+            
+            if st.sidebar.button("Update Entry 更新条目", key="update_btn"):
+                if edit_english_name and edit_chinese_name and edit_thankful_for:
+                    with st.sidebar:
+                        with st.spinner("Updating entry... 正在更新条目..."):
+                            updated_data = {
+                                "english_name": edit_english_name,
+                                "chinese_name": edit_chinese_name,
+                                "role_class": edit_role_class if edit_role_class else "Not specified 未指定",
+                                "thankful_for": edit_thankful_for
+                            }
+                            
+                            if update_entry(entry_id_to_edit, updated_data):
+                                st.sidebar.success("✅ Entry updated successfully! 条目更新成功!")
+                                time.sleep(2)
+                                st.rerun()
+                            else:
+                                st.sidebar.error("❌ Failed to update entry. 更新条目失败。")
+                else:
+                    st.sidebar.error("❌ Please fill in all required fields. 请填写所有必填字段。")
+    
+    else:
+        st.sidebar.info("No entries to edit 没有可编辑的条目")
+    
+    # Reorder Entries Section
+    st.sidebar.subheader("Reorder Entries 重新排序条目")
+    
+    if entries:
+        st.sidebar.write("Set the display order 设置显示顺序:")
+        
+        # Get current order information
+        sorted_entries = get_all_entries_sorted()
+        entry_list = list(sorted_entries.items())
+        
+        # Create a list of entries for the reorder interface
+        entry_options = []
+        for entry_id, info in entry_list:
+            display_text = f"{info['english_name']} ({info['chinese_name']}) - {info.get('thankful_for', '')[:30]}..."
+            entry_options.append((entry_id, display_text, info.get('manual_order')))
+        
+        # Display current order
+        st.sidebar.write("**Current Order 当前顺序:**")
+        for i, (entry_id, display_text, manual_order) in enumerate(entry_options, 1):
+            order_indicator = f" [Position {manual_order}]" if manual_order else ""
+            st.sidebar.write(f"{i}. {display_text}{order_indicator}")
+        
+        # Simple reorder interface - select position for each entry
+        st.sidebar.write("**Set New Order 设置新顺序:**")
+        
+        # Create a dictionary to store new positions
+        new_positions = {}
+        
+        for entry_id, display_text, current_order in entry_options:
+            new_position = st.sidebar.number_input(
+                f"Position for: {display_text[:40]}...",
+                min_value=1,
+                max_value=len(entries),
+                value=current_order if current_order else len(entries),
+                key=f"order_{entry_id}"
+            )
+            new_positions[entry_id] = new_position
+        
+        if st.sidebar.button("Apply New Order 应用新顺序", key="apply_order"):
+            with st.sidebar:
+                with st.spinner("Updating order... 正在更新顺序..."):
+                    success_count = 0
+                    for entry_id, new_position in new_positions.items():
+                        if update_entry_order(entry_id, {'manual_order': new_position}):
+                            success_count += 1
+                    
+                    if success_count == len(new_positions):
+                        st.sidebar.success(f"✅ Order updated for {success_count} entries! 已更新{success_count}个条目的顺序!")
+                        time.sleep(2)
+                        st.rerun()
+                    else:
+                        st.sidebar.error("❌ Some entries failed to update. 部分条目更新失败。")
+        
+        # Reset order button
+        if st.sidebar.button("Reset to Default Order 重置为默认顺序", key="reset_order"):
+            with st.sidebar:
+                with st.spinner("Resetting order... 正在重置顺序..."):
+                    success_count = 0
+                    for entry_id in entries.keys():
+                        # Use DELETE_FIELD to remove the manual_order field
+                        if update_entry_order(entry_id, {'manual_order': firestore.DELETE_FIELD}):
+                            success_count += 1
+                    
+                    st.sidebar.success(f"✅ Order reset for {success_count} entries! 已重置{success_count}个条目的顺序!")
+                    time.sleep(2)
+                    st.rerun()
+    
+    else:
+        st.sidebar.info("No entries to reorder 没有可重新排序的条目")
     
     # Individual entry deletion
     st.sidebar.subheader("Delete Specific Entry 删除特定条目")
@@ -348,13 +538,3 @@ if st.button("🔄 Refresh Page 刷新页面", key="refresh_btn"):
     with st.spinner("Refreshing... 正在刷新..."):
         time.sleep(1)
         st.rerun()
-
-# Information about data persistence
-# st.sidebar.markdown("---")
-# st.sidebar.info("""
-# **About Data Storage 关于数据存储:**
-# All entries are stored securely in Google Firebase Firestore. 
-# Your data will persist even when the app is updated.
-# 所有条目都安全地存储在 Google Firebase Firestore 中。
-# 即使应用更新，您的数据也会保留。
-# """)
