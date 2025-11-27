@@ -152,7 +152,7 @@ if 'success_message' not in st.session_state:
 # Simple form without clear_on_submit for better control
 english_name = st.sidebar.text_input("English Name 英文名", key="english_name")
 chinese_name = st.sidebar.text_input("Chinese Name 中文名", key="chinese_name")
-role_class = st.sidebar.text_input("Class or Role (e.g., Class A, Teacher, Parent, etc.) 班级或身份 (例如: A班, 老师, 家长等)", key="role_class")
+role_class = st.sidebar.text_input("Class or Role (e.g., G10-2, Teacher, Administrator, etc.) 班级或身份 (例如: A班, 老师, 家长等)", key="role_class")
 thankful_for = st.sidebar.text_area("What are you thankful for? 你感恩什么?", key="thankful_for")
 
 # Submit button
@@ -350,11 +350,11 @@ if st.button("🔄 Refresh Page 刷新页面", key="refresh_btn"):
         st.rerun()
 
 # Information about data persistence
-st.sidebar.markdown("---")
-st.sidebar.info("""
-**About Data Storage 关于数据存储:**
-All entries are stored securely in Google Firebase Firestore. 
-Your data will persist even when the app is updated.
-所有条目都安全地存储在 Google Firebase Firestore 中。
-即使应用更新，您的数据也会保留。
-""")
+# st.sidebar.markdown("---")
+# st.sidebar.info("""
+# **About Data Storage 关于数据存储:**
+# All entries are stored securely in Google Firebase Firestore. 
+# Your data will persist even when the app is updated.
+# 所有条目都安全地存储在 Google Firebase Firestore 中。
+# 即使应用更新，您的数据也会保留。
+# """)
