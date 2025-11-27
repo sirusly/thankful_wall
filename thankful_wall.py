@@ -17,6 +17,7 @@ st.caption("This application was created entirely with Python! 这个应用程�
 # New markdown section with the gratitude message
 st.markdown("""
 This is a special time of the year when we gather to express gratitude for all that we appreciate in life. We may be thankful for:
+
 在这个一年一度的特别时刻，我们欢聚一堂，感恩生活中值得珍惜的一切。我们感谢的可能是：
 
 - Family and friends 家人和朋友
@@ -29,10 +30,14 @@ This is a special time of the year when we gather to express gratitude for all t
 - Technology 科技
 - Music and art 音乐和艺术
 - A peaceful life 和平的生活
-…and so much more! Let's always remember to cherish what we have. 	
+
+…and so much more! Let's always remember to cherish what we have.
+
 ……还有很多很多！愿我们始终心怀感恩，珍惜所拥有的一切。
 """)
 
+# Add the smaller message about Python
+st.caption("This application was created entirely with Python. 这个应用程序完全使用Python创建。")
 
 # Initialize Firebase
 def initialize_firebase():
@@ -131,8 +136,8 @@ def delete_all_entries():
 # Load the current data
 entries = get_all_entries()
 
-# --- Sidebar for Adding New Entries ---
-st.sidebar.header("Add Your Gratitude 添加感恩")
+# --- MAIN AREA: Add Your Gratitude Form ---
+st.header("Add Your Gratitude 添加感恩")
 
 # Initialize session state for form submission
 if 'submitted' not in st.session_state:
@@ -140,17 +145,22 @@ if 'submitted' not in st.session_state:
 if 'success_message' not in st.session_state:
     st.session_state.success_message = ""
 
-# Simple form without clear_on_submit for better control
-english_name = st.sidebar.text_input("English Name 英文名", key="english_name")
-chinese_name = st.sidebar.text_input("Chinese Name 中文名", key="chinese_name")
-role_class = st.sidebar.text_input("Class or Role (e.g., G10-2, Teacher, Administrator, etc.) 班级或身份 (例如: A班, 老师, 家长等)", key="role_class")
-thankful_for = st.sidebar.text_area("What are you thankful for? 你感恩什么?", key="thankful_for")
+# Create the form in the main area (not sidebar)
+with st.form("main_entry_form"):
+    col1, col2 = st.columns(2)
+    with col1:
+        english_name = st.text_input("English Name 英文名", key="english_name")
+    with col2:
+        chinese_name = st.text_input("Chinese Name 中文名", key="chinese_name")
+    
+    role_class = st.text_input("Class or Role (e.g., Class A, Teacher, Parent, etc.) 班级或身份 (例如: A班, 老师, 家长等)", key="role_class")
+    thankful_for = st.text_area("What are you thankful for? 你感恩什么?", key="thankful_for")
+    
+    submitted = st.form_submit_button("Submit 提交", type="primary")
 
-# Submit button
-if st.sidebar.button("Submit 提交", type="primary"):
-    if english_name and chinese_name and thankful_for:
-        # Show loading state
-        with st.sidebar:
+    if submitted:
+        if english_name and chinese_name and thankful_for:
+            # Show loading state
             with st.spinner("Saving your entry... 正在保存您的条目..."):
                 entry_data = {
                     "english_name": english_name,
@@ -172,16 +182,16 @@ if st.sidebar.button("Submit 提交", type="primary"):
                     # Force immediate rerun to show success message and refresh data
                     st.rerun()
                 else:
-                    st.sidebar.error("❌ Failed to save entry. Please try again. 保存失败，请重试。")
-    else:
-        st.sidebar.error("❌ Please fill in name fields and what you're thankful for. 请填写姓名字段和您感恩的内容。")
+                    st.error("❌ Failed to save entry. Please try again. 保存失败，请重试。")
+        else:
+            st.error("❌ Please fill in name fields and what you're thankful for. 请填写姓名字段和您感恩的内容。")
 
 # Display success message if form was submitted
 if st.session_state.submitted and st.session_state.success_message:
-    st.sidebar.success(st.session_state.success_message)
+    st.success(st.session_state.success_message)
     
     # Show a progress bar to indicate waiting time
-    progress_bar = st.sidebar.progress(0)
+    progress_bar = st.progress(0)
     for i in range(100):
         # Update progress bar
         progress_bar.progress(i + 1)
@@ -193,7 +203,7 @@ if st.session_state.submitted and st.session_state.success_message:
     st.rerun()
 
 # --- Main Area: Display the Thankful Wall ---
-st.header("Our Thankful Wall. 我们的感恩墙. ↓ Scroll down to view the wall entries ↓. ↓ 向下滚动查看更多留言。↓")
+st.header("Our Thankful Wall 我们的感恩墙")
 
 # Refresh entries data
 entries = get_all_entries()
@@ -341,11 +351,11 @@ if st.button("🔄 Refresh Page 刷新页面", key="refresh_btn"):
         st.rerun()
 
 # Information about data persistence
-# st.sidebar.markdown("---")
-# st.sidebar.info("""
-# **About Data Storage 关于数据存储:**
-# All entries are stored securely in Google Firebase Firestore. 
-# Your data will persist even when the app is updated.
-# 所有条目都安全地存储在 Google Firebase Firestore 中。
-# 即使应用更新，您的数据也会保留。
-# """)
+st.sidebar.markdown("---")
+st.sidebar.info("""
+**About Data Storage 关于数据存储:**
+All entries are stored securely in Google Firebase Firestore. 
+Your data will persist even when the app is updated.
+所有条目都安全地存储在 Google Firebase Firestore 中。
+即使应用更新，您的数据也会保留。
+""")
