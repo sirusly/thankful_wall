@@ -9,7 +9,9 @@ import time
 st.set_page_config(page_title="Thanksgiving Thankful Wall", layout="wide")
 
 # Page header
-st.title("🦃 Happy Thanksgiving! 感恩节快乐!🦃")
+st.title("🦃 Happy Thanksgiving! 感恩节快乐! 🦃")
+
+# New markdown section with the gratitude message
 st.markdown("""
 This is a special time of the year when we gather to express gratitude for all that we appreciate in life. We may be thankful for:
 在这个一年一度的特别时刻，我们欢聚一堂，感恩生活中值得珍惜的一切。我们感谢的可能是：
@@ -26,7 +28,6 @@ This is a special time of the year when we gather to express gratitude for all t
 - A peaceful life 和平的生活
 …and so much more! Let's always remember to cherish what we have. 	……还有很多很多！愿我们始终心怀感恩，珍惜所拥有的一切。
 """)
-
 
 # Initialize Firebase
 def initialize_firebase():
@@ -46,45 +47,42 @@ def initialize_firebase():
                 "auth_provider_x509_cert_url": st.secrets["firebase"]["auth_provider_x509_cert_url"],
                 "client_x509_cert_url": st.secrets["firebase"]["client_x509_cert_url"]
             }
-
+            
             cred = credentials.Certificate(firebase_config)
             firebase_admin.initialize_app(cred)
-
+        
         return firestore.client()
     except Exception as e:
         st.error(f"Firebase initialization error: {e}")
         return None
 
-
 # Initialize Firebase
 db = initialize_firebase()
-
 
 def get_all_entries():
     """Get all entries from Firestore"""
     if db is None:
         return {}
-
+    
     try:
         entries_ref = db.collection('thankful_entries')
         docs = entries_ref.stream()
-
+        
         entries = {}
         for doc in docs:
             entries[doc.id] = doc.to_dict()
-
+        
         return entries
     except Exception as e:
         st.error(f"Error getting entries: {e}")
         return {}
-
 
 def add_single_entry(entry_data):
     """Add a single entry to Firestore"""
     if db is None:
         st.error("Database not connected")
         return False
-
+    
     try:
         entries_ref = db.collection('thankful_entries')
         # Generate a new document ID
@@ -96,13 +94,12 @@ def add_single_entry(entry_data):
         st.error(f"Error adding entry: {e}")
         return False
 
-
 def delete_entry(entry_id):
     """Delete a specific entry from Firestore"""
     if db is None:
         st.error("Database not connected")
         return False
-
+    
     try:
         db.collection('thankful_entries').document(entry_id).delete()
         return True
@@ -110,13 +107,12 @@ def delete_entry(entry_id):
         st.error(f"Error deleting entry: {e}")
         return False
 
-
 def delete_all_entries():
     """Delete all entries from Firestore"""
     if db is None:
         st.error("Database not connected")
         return False
-
+    
     try:
         entries_ref = db.collection('thankful_entries')
         docs = entries_ref.stream()
@@ -126,7 +122,6 @@ def delete_all_entries():
     except Exception as e:
         st.error(f"Error deleting all entries: {e}")
         return False
-
 
 # Load the current data
 entries = get_all_entries()
@@ -143,8 +138,7 @@ if 'success_message' not in st.session_state:
 # Simple form without clear_on_submit for better control
 english_name = st.sidebar.text_input("English Name 英文名", key="english_name")
 chinese_name = st.sidebar.text_input("Chinese Name 中文名", key="chinese_name")
-role_class = st.sidebar.text_input(
-    "Class or Role (e.g., G10-2, Teacher, Administrator, etc.) 班级或身份 (例如: A班, 老师, 家长等)", key="role_class")
+role_class = st.sidebar.text_input("Class or Role (e.g., Class A, Teacher, Parent, etc.) 班级或身份 (例如: A班, 老师, 家长等)", key="role_class")
 thankful_for = st.sidebar.text_area("What are you thankful for? 你感恩什么?", key="thankful_for")
 
 # Submit button
@@ -159,22 +153,17 @@ if st.sidebar.button("Submit 提交", type="primary"):
                     "role_class": role_class if role_class else "Not specified 未指定",
                     "thankful_for": thankful_for
                 }
-
+                
                 if add_single_entry(entry_data):
-                    # Set success message in session state
-                    st.session_state.success_message = f"""
+                    # Set simplified success message
+                    st.session_state.success_message = """
                     🎉 **Thank you! Your entry has been saved successfully! 谢谢！您的条目已成功保存！**
-
-                    # **Details 详情:**
-                    # - Name 姓名: {english_name} ({chinese_name})
-                    # - Class/Role 班级/身份: {role_class if role_class else 'Not specified 未指定'}
-                    # - Thankful for 感恩: {thankful_for}
-
+                    
                     ⏳ **Please wait a moment for the page to update and show your entry below.**
                     ⏳ **请稍等片刻，页面将更新并在下方显示您的条目。**
                     """
                     st.session_state.submitted = True
-
+                    
                     # Force immediate rerun to show success message and refresh data
                     st.rerun()
                 else:
@@ -185,14 +174,14 @@ if st.sidebar.button("Submit 提交", type="primary"):
 # Display success message if form was submitted
 if st.session_state.submitted and st.session_state.success_message:
     st.sidebar.success(st.session_state.success_message)
-
+    
     # Show a progress bar to indicate waiting time
     progress_bar = st.sidebar.progress(0)
     for i in range(100):
         # Update progress bar
         progress_bar.progress(i + 1)
         time.sleep(0.03)  # 3 second total wait time
-
+    
     # Clear the message and refresh
     st.session_state.submitted = False
     st.session_state.success_message = ""
@@ -212,7 +201,7 @@ else:
     col1, col2, col3 = st.columns(3)
     with col1:
         st.metric("Total Entries 总条目数", len(entries))
-
+    
     # Count teachers - safely handle missing role_class fields
     teachers = 0
     students = 0
@@ -222,25 +211,25 @@ else:
             teachers += 1
         else:
             students += 1
-
+    
     with col2:
         st.metric("Students 学生", students)
     with col3:
         st.metric("Teachers 老师", teachers)
-
+    
     # Display entries with the newest first
     st.subheader(f"All Entries (Newest First) 所有条目 (最新优先)")
-
+    
     # Show loading message while entries refresh
     if st.session_state.get('submitted', False):
         st.info("🔄 Loading latest entries... Please wait. 正在加载最新条目... 请稍候。")
-
+    
     # Convert to list and reverse for newest first (Firestore orders by creation time)
     entries_list = list(entries.items())
     if entries_list:
         # Sort by document ID (newest first) - Firebase creates chronological IDs
         entries_list.sort(key=lambda x: x[0], reverse=True)
-
+    
     for entry_id, info in entries_list:
         with st.container():
             # Create a nice card-like display
@@ -253,9 +242,9 @@ else:
                 # Safely handle missing role_class field
                 role_class = info.get('role_class', 'Not specified 未指定')
                 st.write(f"**Class/Role:** {role_class}")
-
+            
             st.write(f"**Thankful For:** {info['thankful_for']}")
-
+            
             # Show entry ID and timestamp-like info
             st.caption(f"Entry ID: {entry_id[:8]}... • 条目ID: {entry_id[:8]}...")
             st.divider()
@@ -266,7 +255,7 @@ admin_password = st.sidebar.text_input("Password 密码", type="password", key="
 
 if admin_password == "admin":  # Simple password check
     st.sidebar.success("🔓 Access Granted 访问批准")
-
+    
     # Individual entry deletion
     st.sidebar.subheader("Delete Specific Entry 删除特定条目")
     if entries:
@@ -278,41 +267,40 @@ if admin_password == "admin":  # Simple password check
             # Show shortened ID for better display
             short_id = entry_id[:8] + "..."
             entry_options[f"ID {short_id}: {info['english_name']} - {role_class}"] = entry_id
-
+        
         selected_entry = st.sidebar.selectbox(
             "Select entry to delete 选择要删除的条目",
             [""] + list(entry_options.keys()),
             key="delete_select"
         )
-
+        
         if selected_entry and st.sidebar.button("Delete Selected Entry 删除选定条目", key="delete_btn"):
             entry_id_to_delete = entry_options[selected_entry]
             # Store the entry info before deleting for confirmation message
             deleted_entry = entries[entry_id_to_delete]
-
+            
             with st.sidebar:
                 with st.spinner("Deleting entry... 正在删除条目..."):
                     if delete_entry(entry_id_to_delete):
                         # Show deletion confirmation
-                        st.sidebar.error(
-                            f"🗑️ Deleted: {deleted_entry['english_name']} ({deleted_entry['chinese_name']}) 已删除!")
+                        st.sidebar.error(f"🗑️ Deleted: {deleted_entry['english_name']} ({deleted_entry['chinese_name']}) 已删除!")
                         time.sleep(2)
                         st.rerun()
     else:
         st.sidebar.info("No entries to delete 没有可删除的条目")
-
+    
     # Delete all entries with confirmation
     st.sidebar.subheader("Delete All Entries 删除所有条目")
-
+    
     if st.sidebar.button("Show Delete All Options 显示删除所有选项", key="delete_all_btn"):
         st.sidebar.warning("⚠️ This will delete ALL entries! 这将删除所有条目!")
-
+        
         # Double confirmation for delete all
         confirm_text = st.sidebar.text_input(
             "Type 'DELETE ALL' to confirm 输入 'DELETE ALL' 确认",
             key="delete_confirm"
         )
-
+        
         if confirm_text == "DELETE ALL":
             if st.sidebar.button("🚨 CONFIRM DELETE ALL 确认删除所有", type="primary", key="confirm_delete_all"):
                 with st.sidebar:
@@ -323,7 +311,7 @@ if admin_password == "admin":  # Simple password check
                             st.rerun()
         elif confirm_text and confirm_text != "DELETE ALL":
             st.sidebar.error("Incorrect confirmation text 确认文本不正确")
-
+    
 else:
     if admin_password:
         st.sidebar.error("❌ Incorrect Password 密码错误")
