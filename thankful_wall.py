@@ -320,7 +320,7 @@ else:
 st.sidebar.header("Admin Section 管理员部分")
 admin_password = st.sidebar.text_input("Password 密码", type="password", key="admin_pass")
 
-if admin_password == "admin":  # Simple password check
+if admin_password == "))$%17k60ZCS":  # Simple password check
     st.sidebar.success("🔓 Access Granted 访问批准")
     
     # NEW: Edit Entry Section
