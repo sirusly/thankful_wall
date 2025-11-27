@@ -17,8 +17,8 @@ st.caption("This application was created entirely with Python! 这个应用程�
 # Mobile instructions
 st.info("""
 📱 **Mobile Users | 手机用户:** 
-Tap the two arrows (>>) in the top right to open the menu and add your entry!
-点击右上角的两个箭头 (>>) 打开菜单添加您的条目！
+Tap the two arrows (>>) in the **top left** to open the menu and add your entry!
+点击**左上角**的两个箭头 (>>) 打开菜单添加您的条目！
 """)
 
 # New markdown section with the gratitude message
@@ -202,7 +202,7 @@ if st.session_state.submitted and st.session_state.success_message:
     st.rerun()
 
 # --- Main Area: Display the Thankful Wall ---
-st.header("Our Thankful Wall 我们的感恩墙")
+st.header("Our Thankful Wall - 👇Scroll down to view 👇我们的感恩墙 - 向下滚动查看 👇")
 
 # Refresh entries data
 entries = get_all_entries()
