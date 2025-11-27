@@ -308,9 +308,9 @@ else:
     # Check if manual ordering is being used
     has_manual_order = any(entry.get('manual_order') for entry in entries.values())
     if has_manual_order:
-        st.subheader(f"All Entries (Manual Order) 所有条目 (手动排序)")
+        st.subheader(f"All Entries 所有条目 ")
     else:
-        st.subheader(f"All Entries (Newest First) 所有条目 (最新优先)")
+        st.subheader(f"All Entries 所有条目")
     
     # Show loading message while entries refresh
     if st.session_state.get('submitted', False):
