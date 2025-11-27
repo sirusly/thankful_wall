@@ -206,5 +206,363 @@ def delete_all_entries():
 # Load the current data - USING SORTED ENTRIES
 entries = get_all_entries_sorted()
 
-# --- Rest of your code remains exactly the same ---
-# [All the sidebar forms, admin sections, and display code stay identical]
+# --- Sidebar for Adding New Entries ---
+st.sidebar.header("Add Your Gratitude 添加感恩")
+
+# Initialize session state for form submission
+if 'submitted' not in st.session_state:
+    st.session_state.submitted = False
+if 'success_message' not in st.session_state:
+    st.session_state.success_message = ""
+if 'editing_entry' not in st.session_state:
+    st.session_state.editing_entry = None
+
+# Simple form without clear_on_submit for better control
+english_name = st.sidebar.text_input("English Name 英文名", key="english_name")
+chinese_name = st.sidebar.text_input("Chinese Name 中文名", key="chinese_name")
+role_class = st.sidebar.text_input("Class or Role (e.g., G10-2, Teacher, Administrator, etc.) 班级或身份 (例如: A班, 老师, 家长等)", key="role_class")
+thankful_for = st.sidebar.text_area("What are you thankful for? 你感恩什么?", key="thankful_for")
+
+# Submit button
+if st.sidebar.button("Submit 提交", type="primary"):
+    if english_name and chinese_name and thankful_for:
+        # Show loading state
+        with st.sidebar:
+            with st.spinner("Saving your entry... 正在保存您的条目..."):
+                entry_data = {
+                    "english_name": english_name,
+                    "chinese_name": chinese_name,
+                    "role_class": role_class if role_class else "Not specified 未指定",
+                    "thankful_for": thankful_for
+                }
+                
+                if add_single_entry(entry_data):
+                    # Set simplified success message
+                    st.session_state.success_message = """
+                    🎉 **Thank you! Your entry has been saved successfully! 谢谢！您的条目已成功保存！**
+                    
+                    ⏳ **Please wait a moment for the page to update and show your entry below.**
+                    ⏳ **请稍等片刻，页面将更新并在下方显示您的条目。**
+                    """
+                    st.session_state.submitted = True
+                    
+                    # Force immediate rerun to show success message and refresh data
+                    st.rerun()
+                else:
+                    st.sidebar.error("❌ Failed to save entry. Please try again. 保存失败，请重试。")
+    else:
+        st.sidebar.error("❌ Please fill in name fields and what you're thankful for. 请填写姓名字段和您感恩的内容。")
+
+# Display success message if form was submitted
+if st.session_state.submitted and st.session_state.success_message:
+    st.sidebar.success(st.session_state.success_message)
+    
+    # Show a progress bar to indicate waiting time
+    progress_bar = st.sidebar.progress(0)
+    for i in range(100):
+        # Update progress bar
+        progress_bar.progress(i + 1)
+        time.sleep(0.03)  # 3 second total wait time
+    
+    # Clear the message and refresh
+    st.session_state.submitted = False
+    st.session_state.success_message = ""
+    st.rerun()
+
+# --- Main Area: Display the Thankful Wall ---
+st.header("Our Thankful Wall - 👇Scroll down to view 👇我们的感恩墙 - 向下滚动查看 👇")
+
+# Refresh entries data - USING SORTED ENTRIES
+entries = get_all_entries_sorted()
+
+# Display all entries
+if not entries:
+    st.info("📝 The wall is empty... Let's add some gratitude! 墙上空空的... 让我们添加一些感恩!")
+else:
+    # Show statistics
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Total Entries 总条目数", len(entries))
+    
+    # Count teachers - safely handle missing role_class fields
+    teachers = 0
+    students = 0
+    for entry in entries.values():
+        role = entry.get("role_class", "").lower()
+        if "teacher" in role:
+            teachers += 1
+        else:
+            students += 1
+    
+    with col2:
+        st.metric("Students 学生", students)
+    with col3:
+        st.metric("Teachers 老师", teachers)
+    
+    # Check if manual ordering is being used
+    has_manual_order = any(entry.get('manual_order') for entry in entries.values())
+    if has_manual_order:
+        st.subheader(f"All Entries (Manual Order) 所有条目 (手动排序)")
+    else:
+        st.subheader(f"All Entries (Newest First) 所有条目 (最新优先)")
+    
+    # Show loading message while entries refresh
+    if st.session_state.get('submitted', False):
+        st.info("🔄 Loading latest entries... Please wait. 正在加载最新条目... 请稍候。")
+    
+    # Display entries in the sorted order (already sorted by get_all_entries_sorted)
+    for entry_id, info in entries.items():
+        with st.container():
+            # Create a nice card-like display
+            col1, col2, col3 = st.columns([1, 1, 2])
+            with col1:
+                st.write(f"**English Name:** {info['english_name']}")
+            with col2:
+                st.write(f"**Chinese Name:** {info['chinese_name']}")
+            with col3:
+                # Safely handle missing role_class field
+                role_class = info.get('role_class', 'Not specified 未指定')
+                st.write(f"**Class/Role:** {role_class}")
+            
+            st.write(f"**Thankful For:** {info['thankful_for']}")
+            
+            # Show manual order if it exists
+            if info.get('manual_order'):
+                st.caption(f"Position: {info['manual_order']} • 位置: {info['manual_order']} • Entry ID: {entry_id[:8]}...")
+            else:
+                st.caption(f"Entry ID: {entry_id[:8]}... • 条目ID: {entry_id[:8]}...")
+            st.divider()
+
+# --- Admin Section in the Sidebar ---
+st.sidebar.header("Admin Section 管理员部分")
+admin_password = st.sidebar.text_input("Password 密码", type="password", key="admin_pass")
+
+if admin_password == "))$%17k60ZCS":  # Updated password check
+    st.sidebar.success("🔓 Access Granted 访问批准")
+    
+    # Edit Entry Section
+    st.sidebar.subheader("Edit Entry 编辑条目")
+    
+    if entries:
+        # Create a dropdown of all entries for editing
+        edit_entry_options = {}
+        for entry_id, info in entries.items():
+            role_class = info.get('role_class', 'Not specified')
+            edit_entry_options[f"ID {entry_id[:8]}: {info['english_name']} - {role_class}"] = entry_id
+        
+        selected_edit_entry = st.sidebar.selectbox(
+            "Select entry to edit 选择要编辑的条目",
+            [""] + list(edit_entry_options.keys()),
+            key="edit_select"
+        )
+        
+        if selected_edit_entry:
+            entry_id_to_edit = edit_entry_options[selected_edit_entry]
+            entry_to_edit = entries[entry_id_to_edit]
+            
+            # Pre-fill form with existing data
+            st.sidebar.write("**Edit Entry Details 编辑条目详情:**")
+            
+            edit_english_name = st.sidebar.text_input(
+                "English Name 英文名", 
+                value=entry_to_edit['english_name'],
+                key="edit_english_name"
+            )
+            edit_chinese_name = st.sidebar.text_input(
+                "Chinese Name 中文名", 
+                value=entry_to_edit['chinese_name'],
+                key="edit_chinese_name"
+            )
+            edit_role_class = st.sidebar.text_input(
+                "Class or Role 班级或身份", 
+                value=entry_to_edit.get('role_class', ''),
+                key="edit_role_class"
+            )
+            edit_thankful_for = st.sidebar.text_area(
+                "What are you thankful for? 你感恩什么?", 
+                value=entry_to_edit['thankful_for'],
+                key="edit_thankful_for"
+            )
+            
+            if st.sidebar.button("Update Entry 更新条目", key="update_btn"):
+                if edit_english_name and edit_chinese_name and edit_thankful_for:
+                    with st.sidebar:
+                        with st.spinner("Updating entry... 正在更新条目..."):
+                            updated_data = {
+                                "english_name": edit_english_name,
+                                "chinese_name": edit_chinese_name,
+                                "role_class": edit_role_class if edit_role_class else "Not specified 未指定",
+                                "thankful_for": edit_thankful_for
+                            }
+                            
+                            if update_entry(entry_id_to_edit, updated_data):
+                                st.sidebar.success("✅ Entry updated successfully! 条目更新成功!")
+                                time.sleep(2)
+                                st.rerun()
+                            else:
+                                st.sidebar.error("❌ Failed to update entry. 更新条目失败。")
+                else:
+                    st.sidebar.error("❌ Please fill in all required fields. 请填写所有必填字段。")
+    
+    else:
+        st.sidebar.info("No entries to edit 没有可编辑的条目")
+    
+    # Reorder Entries Section - DRAG-AND-DROP STYLE
+    st.sidebar.subheader("Reorder Entries 重新排序条目")
+    
+    if entries:
+        st.sidebar.write("Drag-and-Drop Reorder 拖拽重新排序:")
+        
+        # Get current order
+        current_order = list(entries.items())
+        
+        # Initialize new order in session state if not exists
+        if 'new_order' not in st.session_state:
+            st.session_state.new_order = current_order.copy()
+        
+        # Create reorder interface
+        st.sidebar.write("Select new order from top to bottom 从上到下选择新顺序:")
+        
+        # Create a list to track used entries
+        used_entries = []
+        
+        for position in range(len(current_order)):
+            available_entries = [entry for entry in current_order if entry[0] not in used_entries]
+            
+            if available_entries:
+                # Create options for this position
+                entry_options = {f"{info['english_name']} ({info['chinese_name']})": (entry_id, info) 
+                                for entry_id, info in available_entries}
+                
+                # Get current selection for this position
+                current_selection = st.session_state.new_order[position] if position < len(st.session_state.new_order) else available_entries[0]
+                current_display = f"{current_selection[1]['english_name']} ({current_selection[1]['chinese_name']})"
+                
+                selected = st.sidebar.selectbox(
+                    f"Position {position + 1} 位置 {position + 1}",
+                    list(entry_options.keys()),
+                    index=list(entry_options.keys()).index(current_display) if current_display in entry_options else 0,
+                    key=f"pos_{position}"
+                )
+                
+                if selected:
+                    selected_id, selected_info = entry_options[selected]
+                    # Update the new order
+                    st.session_state.new_order[position] = (selected_id, selected_info)
+                    used_entries.append(selected_id)
+
+        # Apply new order button
+        if st.sidebar.button("Apply New Order 应用新顺序", key="apply_order"):
+            with st.sidebar:
+                with st.spinner("Updating order... 正在更新顺序..."):
+                    success_count = 0
+                    for new_position, (entry_id, info) in enumerate(st.session_state.new_order, 1):
+                        if update_entry_order(entry_id, {'manual_order': new_position}):
+                            success_count += 1
+                    
+                    if success_count == len(st.session_state.new_order):
+                        st.success("✅ Order updated successfully! 顺序更新成功!")
+                        time.sleep(2)
+                        st.rerun()
+                    else:
+                        st.error("❌ Some entries failed to update. 部分条目更新失败。")
+        
+        # Reset order button
+        if st.sidebar.button("Reset to Default Order 重置为默认顺序", key="reset_order"):
+            with st.sidebar:
+                with st.spinner("Resetting order... 正在重置顺序..."):
+                    success_count = 0
+                    for entry_id in entries.keys():
+                        # Use DELETE_FIELD to remove the manual_order field
+                        if update_entry_order(entry_id, {'manual_order': firestore.DELETE_FIELD}):
+                            success_count += 1
+                    
+                    # Clear the new order from session state
+                    if 'new_order' in st.session_state:
+                        del st.session_state.new_order
+                    
+                    st.sidebar.success(f"✅ Order reset for {success_count} entries! 已重置{success_count}个条目的顺序!")
+                    time.sleep(2)
+                    st.rerun()
+    
+    else:
+        st.sidebar.info("No entries to reorder 没有可重新排序的条目")
+    
+    # Individual entry deletion
+    st.sidebar.subheader("Delete Specific Entry 删除特定条目")
+    if entries:
+        # Create a dropdown of all entries for deletion
+        entry_options = {}
+        for entry_id, info in entries.items():
+            # Safely handle missing role_class field
+            role_class = info.get('role_class', 'Not specified')
+            # Show shortened ID for better display
+            short_id = entry_id[:8] + "..."
+            entry_options[f"ID {short_id}: {info['english_name']} - {role_class}"] = entry_id
+        
+        selected_entry = st.sidebar.selectbox(
+            "Select entry to delete 选择要删除的条目",
+            [""] + list(entry_options.keys()),
+            key="delete_select"
+        )
+        
+        if selected_entry and st.sidebar.button("Delete Selected Entry 删除选定条目", key="delete_btn"):
+            entry_id_to_delete = entry_options[selected_entry]
+            # Store the entry info before deleting for confirmation message
+            deleted_entry = entries[entry_id_to_delete]
+            
+            with st.sidebar:
+                with st.spinner("Deleting entry... 正在删除条目..."):
+                    if delete_entry(entry_id_to_delete):
+                        # Show deletion confirmation
+                        st.sidebar.error(f"🗑️ Deleted: {deleted_entry['english_name']} ({deleted_entry['chinese_name']}) 已删除!")
+                        time.sleep(2)
+                        st.rerun()
+    else:
+        st.sidebar.info("No entries to delete 没有可删除的条目")
+    
+    # Delete all entries with confirmation
+    st.sidebar.subheader("Delete All Entries 删除所有条目")
+    
+    if st.sidebar.button("Show Delete All Options 显示删除所有选项", key="delete_all_btn"):
+        st.sidebar.warning("⚠️ This will delete ALL entries! 这将删除所有条目!")
+        
+        # Double confirmation for delete all
+        confirm_text = st.sidebar.text_input(
+            "Type 'DELETE ALL' to confirm 输入 'DELETE ALL' 确认",
+            key="delete_confirm"
+        )
+        
+        if confirm_text == "DELETE ALL":
+            if st.sidebar.button("🚨 CONFIRM DELETE ALL 确认删除所有", type="primary", key="confirm_delete_all"):
+                with st.sidebar:
+                    with st.spinner("Deleting all entries... 正在删除所有条目..."):
+                        if delete_all_entries():
+                            st.sidebar.error("❌ All entries have been deleted. 所有条目已被删除。")
+                            time.sleep(2)
+                            st.rerun()
+        elif confirm_text and confirm_text != "DELETE ALL":
+            st.sidebar.error("Incorrect confirmation text 确认文本不正确")
+    
+else:
+    if admin_password:
+        st.sidebar.error("❌ Incorrect Password 密码错误")
+
+# --- Footer ---
+st.markdown("---")
+st.markdown("### What we've learned in this project 我们在这个项目中学到了:")
+st.markdown("""
+- **print() statements** - Displaying output
+- **input()** - Getting user input  
+- **if-elif-else statements** - Decision making
+- **Lists and dictionaries** - Data storage
+- **Streamlit** - Creating web applications
+- **JSON file handling** - Data persistence
+- **Firebase Firestore** - Cloud database integration
+""")
+
+# Add a refresh button for good measure
+if st.button("🔄 Refresh Page 刷新页面", key="refresh_btn"):
+    with st.spinner("Refreshing... 正在刷新..."):
+        time.sleep(1)
+        st.rerun()
