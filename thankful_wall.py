@@ -407,81 +407,92 @@ if admin_password == "))$%17k60ZCS":  # Updated password check
     else:
         st.sidebar.info("No entries to edit 没有可编辑的条目")
     
-    # Reorder Entries Section - DRAG-AND-DROP STYLE
+    # Reorder Entries Section - FIXED VERSION
     st.sidebar.subheader("Reorder Entries 重新排序条目")
     
     if entries:
-        st.sidebar.write("Drag-and-Drop Reorder 拖拽重新排序:")
+        st.sidebar.write("Select entries to feature at the top 选择置顶条目:")
         
         # Get current order
         current_order = list(entries.items())
         
         # Initialize new order in session state if not exists
         if 'new_order' not in st.session_state:
-            st.session_state.new_order = current_order.copy()
+            st.session_state.new_order = []
         
-        # Create reorder interface
-        st.sidebar.write("Select new order from top to bottom 从上到下选择新顺序:")
+        # Feature specific entries at the top
+        st.sidebar.write("**Feature entries at top 置顶条目:**")
         
-        # Create a list to track used entries
-        used_entries = []
+        # Create a list of available entries (excluding already selected ones)
+        available_entries = [entry for entry in current_order if entry[0] not in [e[0] for e in st.session_state.new_order]]
         
-        for position in range(len(current_order)):
-            available_entries = [entry for entry in current_order if entry[0] not in used_entries]
+        if available_entries:
+            entry_options = {f"{info['english_name']} ({info['chinese_name']})": (entry_id, info) 
+                            for entry_id, info in available_entries}
             
-            if available_entries:
-                # Create options for this position
-                entry_options = {f"{info['english_name']} ({info['chinese_name']})": (entry_id, info) 
-                                for entry_id, info in available_entries}
+            selected_feature = st.sidebar.selectbox(
+                "Select entry to feature 选择要置顶的条目",
+                [""] + list(entry_options.keys()),
+                key="feature_select"
+            )
+            
+            if selected_feature and st.sidebar.button("Add to Featured 添加到置顶", key="add_featured"):
+                selected_id, selected_info = entry_options[selected_feature]
+                st.session_state.new_order.append((selected_id, selected_info))
+                st.sidebar.success(f"Added {selected_info['english_name']} to featured! 已添加{selected_info['english_name']}到置顶!")
+                st.rerun()
+        
+        # Show current featured entries
+        if st.session_state.new_order:
+            st.sidebar.write("**Currently Featured 当前置顶:**")
+            for i, (entry_id, info) in enumerate(st.session_state.new_order, 1):
+                st.sidebar.write(f"{i}. {info['english_name']} ({info['chinese_name']})")
                 
-                # Get current selection for this position
-                current_selection = st.session_state.new_order[position] if position < len(st.session_state.new_order) else available_entries[0]
-                current_display = f"{current_selection[1]['english_name']} ({current_selection[1]['chinese_name']})"
-                
-                selected = st.sidebar.selectbox(
-                    f"Position {position + 1} 位置 {position + 1}",
-                    list(entry_options.keys()),
-                    index=list(entry_options.keys()).index(current_display) if current_display in entry_options else 0,
-                    key=f"pos_{position}"
-                )
-                
-                if selected:
-                    selected_id, selected_info = entry_options[selected]
-                    # Update the new order
-                    st.session_state.new_order[position] = (selected_id, selected_info)
-                    used_entries.append(selected_id)
+                # Remove button for each featured entry
+                if st.sidebar.button(f"Remove 移除", key=f"remove_{entry_id}"):
+                    st.session_state.new_order = [entry for entry in st.session_state.new_order if entry[0] != entry_id]
+                    st.rerun()
 
         # Apply new order button
-        if st.sidebar.button("Apply New Order 应用新顺序", key="apply_order"):
+        if st.session_state.new_order and st.sidebar.button("Apply Featured Order 应用置顶顺序", key="apply_order"):
             with st.sidebar:
                 with st.spinner("Updating order... 正在更新顺序..."):
+                    # FIRST: Clear ALL manual orders to start fresh
+                    clear_success_count = 0
+                    for entry_id in entries.keys():
+                        if update_entry_order(entry_id, {'manual_order': firestore.DELETE_FIELD}):
+                            clear_success_count += 1
+                    
+                    # THEN: Only set manual orders for the entries we actually want to feature
                     success_count = 0
-                    for new_position, (entry_id, info) in enumerate(st.session_state.new_order, 1):
-                        if update_entry_order(entry_id, {'manual_order': new_position}):
+                    for position, (entry_id, info) in enumerate(st.session_state.new_order, 1):
+                        if update_entry_order(entry_id, {'manual_order': position}):
                             success_count += 1
                     
-                    if success_count == len(st.session_state.new_order):
-                        st.success("✅ Order updated successfully! 顺序更新成功!")
+                    if success_count > 0:
+                        st.success(f"✅ {success_count} entries featured at top! {success_count}个条目已置顶!")
+                        # Clear the session state
+                        st.session_state.new_order = []
                         time.sleep(2)
                         st.rerun()
                     else:
-                        st.error("❌ Some entries failed to update. 部分条目更新失败。")
+                        st.error("❌ Failed to update featured entries. 置顶条目更新失败。")
         
-        # Reset order button
-        if st.sidebar.button("Reset to Default Order 重置为默认顺序", key="reset_order"):
+        # Reset ALL orders button
+        if st.sidebar.button("Reset ALL to Default Order 重置所有为默认顺序", key="reset_order"):
             with st.sidebar:
-                with st.spinner("Resetting order... 正在重置顺序..."):
+                with st.spinner("Resetting all orders... 正在重置所有顺序..."):
                     success_count = 0
                     for entry_id in entries.keys():
-                        # Use DELETE_FIELD to remove the manual_order field
+                        # Use DELETE_FIELD to remove the manual_order field from ALL entries
                         if update_entry_order(entry_id, {'manual_order': firestore.DELETE_FIELD}):
                             success_count += 1
                     
                     # Clear the new order from session state
                     if 'new_order' in st.session_state:
-                        del st.session_state.new_order
+                        st.session_state.new_order = []
                     
-                    st.sidebar.success(f"✅ Order reset for {success_count} entries! 已重置{success_count}个条目的顺序!")
+                    st.sidebar.success(f"✅ All {success_count} entries reset to default order! 所有{success_count}个条目已重置为默认顺序!")
                     time.sleep(2)
                     st.rerun()
     
