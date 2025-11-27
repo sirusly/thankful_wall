@@ -11,6 +11,9 @@ st.set_page_config(page_title="Thanksgiving Thankful Wall", layout="wide")
 # Page header
 st.title("🦃 Happy Thanksgiving! 感恩节快乐! 🦃")
 
+# Add the smaller message about Python
+st.caption("This application was created entirely with Python! 这个应用程序完全使用Python创建!")
+
 # New markdown section with the gratitude message
 st.markdown("""
 This is a special time of the year when we gather to express gratitude for all that we appreciate in life. We may be thankful for:
@@ -29,8 +32,7 @@ This is a special time of the year when we gather to express gratitude for all t
 …and so much more! Let's always remember to cherish what we have. 	
 ……还有很多很多！愿我们始终心怀感恩，珍惜所拥有的一切。
 """)
-# Add the smaller message about Python
-st.caption("This application was created entirely with Python! 这个应用程序完全使用Python创建!")
+
 
 # Initialize Firebase
 def initialize_firebase():
@@ -141,7 +143,7 @@ if 'success_message' not in st.session_state:
 # Simple form without clear_on_submit for better control
 english_name = st.sidebar.text_input("English Name 英文名", key="english_name")
 chinese_name = st.sidebar.text_input("Chinese Name 中文名", key="chinese_name")
-role_class = st.sidebar.text_input("Class or Role (e.g., Class A, Teacher, Parent, etc.) 班级或身份 (例如: A班, 老师, 家长等)", key="role_class")
+role_class = st.sidebar.text_input("Class or Role (e.g., G10-2, Teacher, Administrator, etc.) 班级或身份 (例如: A班, 老师, 家长等)", key="role_class")
 thankful_for = st.sidebar.text_area("What are you thankful for? 你感恩什么?", key="thankful_for")
 
 # Submit button
