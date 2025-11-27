@@ -191,7 +191,7 @@ if st.session_state.submitted and st.session_state.success_message:
     st.rerun()
 
 # --- Main Area: Display the Thankful Wall ---
-st.header("Our Thankful Wall 我们的感恩墙")
+st.header("Our Thankful Wall. 我们的感恩墙. ↓ Scroll down to view the wall entries ↓. ↓ 向下滚动查看更多留言。↓")
 
 # Refresh entries data
 entries = get_all_entries()
