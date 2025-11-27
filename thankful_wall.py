@@ -4,6 +4,7 @@ from firebase_admin import credentials, firestore
 import json
 import os
 import time
+import random
 
 # Set the page title and layout
 st.set_page_config(page_title="Thanksgiving Thankful Wall", layout="wide")
@@ -222,6 +223,13 @@ if 'success_message' not in st.session_state:
     st.session_state.success_message = ""
 if 'editing_entry' not in st.session_state:
     st.session_state.editing_entry = None
+# Initialize session state for cycling
+if 'current_cycle_index' not in st.session_state:
+    st.session_state.current_cycle_index = 0
+if 'last_refresh' not in st.session_state:
+    st.session_state.last_refresh = time.time()
+if 'cycle_entries' not in st.session_state:
+    st.session_state.cycle_entries = True
 
 # Simple form without clear_on_submit for better control
 english_name = st.sidebar.text_input("English Name 英文名", key="english_name")
@@ -308,15 +316,108 @@ else:
     # Check if manual ordering is being used
     has_manual_order = any(entry.get('manual_order') for entry in entries.values())
     if has_manual_order:
-        st.subheader(f"All Entries 所有条目 ")
+        st.subheader(f"All Entries (Manual Order) 所有条目 (手动排序)")
     else:
-        st.subheader(f"All Entries 所有条目")
+        st.subheader(f"All Entries (Newest First) 所有条目 (最新优先)")
     
     # Show loading message while entries refresh
     if st.session_state.get('submitted', False):
         st.info("🔄 Loading latest entries... Please wait. 正在加载最新条目... 请稍候。")
     
-    # Display entries in the sorted order (already sorted by get_all_entries_sorted)
+    # --- AUTO-CYCLING FEATURE ---
+    st.sidebar.header("Display Settings 显示设置")
+    
+    # Toggle for cycling
+    cycle_enabled = st.sidebar.toggle("Enable Auto-Cycling 启用自动轮播", value=st.session_state.cycle_entries)
+    
+    if cycle_enabled != st.session_state.cycle_entries:
+        st.session_state.cycle_entries = cycle_enabled
+        st.session_state.current_cycle_index = 0
+        st.rerun()
+    
+    if cycle_enabled:
+        # Cycling controls
+        cycle_speed = st.sidebar.slider("Cycle Speed (seconds) 轮播速度 (秒)", 3, 30, 10)
+        
+        # Convert entries to list for cycling
+        entries_list = list(entries.items())
+        
+        # Check if it's time to cycle to the next entry
+        current_time = time.time()
+        if current_time - st.session_state.last_refresh > cycle_speed:
+            st.session_state.current_cycle_index = (st.session_state.current_cycle_index + 1) % len(entries_list)
+            st.session_state.last_refresh = current_time
+            st.rerun()
+        
+        # Display current cycling entry with special styling
+        if entries_list:
+            current_entry_id, current_info = entries_list[st.session_state.current_cycle_index]
+            
+            # Create a highlighted container for the cycling entry
+            with st.container():
+                st.markdown("""
+                <style>
+                .cycling-entry {
+                    border: 3px solid #FF6B00;
+                    border-radius: 10px;
+                    padding: 20px;
+                    margin: 10px 0;
+                    background: linear-gradient(135deg, #FFF3E0, #FFE0B2);
+                    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+                    animation: pulse 2s infinite;
+                }
+                @keyframes pulse {
+                    0% { box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+                    50% { box-shadow: 0 6px 12px rgba(255,107,0,0.3); }
+                    100% { box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+                }
+                </style>
+                """, unsafe_allow_html=True)
+                
+                st.markdown(f'<div class="cycling-entry">', unsafe_allow_html=True)
+                
+                st.markdown(f"### 🎯 Currently Displaying 当前展示 ({st.session_state.current_cycle_index + 1}/{len(entries_list)})")
+                
+                col1, col2, col3 = st.columns([1, 1, 2])
+                with col1:
+                    st.write(f"**English Name:** {current_info['english_name']}")
+                with col2:
+                    st.write(f"**Chinese Name:** {current_info['chinese_name']}")
+                with col3:
+                    role_class = current_info.get('role_class', 'Not specified 未指定')
+                    st.write(f"**Class/Role:** {role_class}")
+                
+                st.write(f"**Thankful For:** {current_info['thankful_for']}")
+                
+                # Show manual order if it exists
+                if current_info.get('manual_order'):
+                    st.caption(f"Position: {current_info['manual_order']} • 位置: {current_info['manual_order']} • Entry ID: {current_entry_id[:8]}...")
+                else:
+                    st.caption(f"Entry ID: {current_entry_id[:8]}... • 条目ID: {current_entry_id[:8]}...")
+                
+                st.markdown('</div>', unsafe_allow_html=True)
+                
+                # Progress bar for cycling
+                progress = ((current_time - st.session_state.last_refresh) / cycle_speed)
+                st.progress(progress, text=f"Next entry in {cycle_speed - int(current_time - st.session_state.last_refresh)} seconds 下一条目 {cycle_speed - int(current_time - st.session_state.last_refresh)} 秒后")
+                
+                # Manual navigation
+                col_nav1, col_nav2, col_nav3 = st.columns([1, 2, 1])
+                with col_nav1:
+                    if st.button("⏮️ Previous 上一条", key="prev_cycle"):
+                        st.session_state.current_cycle_index = (st.session_state.current_cycle_index - 1) % len(entries_list)
+                        st.session_state.last_refresh = current_time
+                        st.rerun()
+                with col_nav3:
+                    if st.button("Next 下一条 ⏭️", key="next_cycle"):
+                        st.session_state.current_cycle_index = (st.session_state.current_cycle_index + 1) % len(entries_list)
+                        st.session_state.last_refresh = current_time
+                        st.rerun()
+                
+                st.divider()
+                st.subheader("All Entries 所有条目")
+    
+    # Display all entries in the sorted order (already sorted by get_all_entries_sorted)
     for entry_id, info in entries.items():
         with st.container():
             # Create a nice card-like display
@@ -576,6 +677,7 @@ st.markdown("""
 - **Streamlit** - Creating web applications
 - **JSON file handling** - Data persistence
 - **Firebase Firestore** - Cloud database integration
+- **Auto-cycling animations** - Dynamic content display
 """)
 
 # Add a refresh button for good measure
