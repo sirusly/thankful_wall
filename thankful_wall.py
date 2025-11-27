@@ -320,10 +320,10 @@ else:
 st.sidebar.header("Admin Section 管理员部分")
 admin_password = st.sidebar.text_input("Password 密码", type="password", key="admin_pass")
 
-if admin_password == "))$%17k60ZCS":  # Simple password check
+if admin_password == "admin":  # Simple password check
     st.sidebar.success("🔓 Access Granted 访问批准")
     
-    # NEW: Edit Entry Section
+    # Edit Entry Section
     st.sidebar.subheader("Edit Entry 编辑条目")
     
     if entries:
@@ -390,7 +390,7 @@ if admin_password == "))$%17k60ZCS":  # Simple password check
     else:
         st.sidebar.info("No entries to edit 没有可编辑的条目")
     
-    # Reorder Entries Section
+    # Reorder Entries Section - UPDATED WITH OPTION 1
     st.sidebar.subheader("Reorder Entries 重新排序条目")
     
     if entries:
@@ -412,24 +412,34 @@ if admin_password == "))$%17k60ZCS":  # Simple password check
             order_indicator = f" [Position {manual_order}]" if manual_order else ""
             st.sidebar.write(f"{i}. {display_text}{order_indicator}")
         
-        # Simple reorder interface - select position for each entry
+        # NEW: Improved reorder interface with individual number inputs
         st.sidebar.write("**Set New Order 设置新顺序:**")
         
-        # Create a dictionary to store new positions
-        new_positions = {}
-        
-        for entry_id, display_text, current_order in entry_options:
-            new_position = st.sidebar.number_input(
-                f"Position for: {display_text[:40]}...",
-                min_value=1,
-                max_value=len(entries),
-                value=current_order if current_order else len(entries),
-                key=f"order_{entry_id}"
-            )
-            new_positions[entry_id] = new_position
-        
-        if st.sidebar.button("Apply New Order 应用新顺序", key="apply_order"):
-            with st.sidebar:
+        # Create a expander to keep it organized
+        with st.sidebar.expander("Set Positions 设置位置", expanded=True):
+            # Create a dictionary to store new positions
+            new_positions = {}
+            
+            for entry_id, info in entries.items():
+                display_text = f"{info['english_name']} ({info['chinese_name']})"
+                current_pos = info.get('manual_order', 'Auto')
+                
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    st.write(f"**{display_text}**")
+                    st.caption(f"Current: {current_pos} • 当前: {current_pos}")
+                with col2:
+                    new_position = st.number_input(
+                        "Position 位置",
+                        min_value=1,
+                        max_value=len(entries),
+                        value=current_pos if current_pos != 'Auto' else len(entries),
+                        key=f"order_{entry_id}",
+                        label_visibility="collapsed"
+                    )
+                    new_positions[entry_id] = new_position
+
+            if st.button("Apply New Order 应用新顺序", key="apply_order"):
                 with st.spinner("Updating order... 正在更新顺序..."):
                     success_count = 0
                     for entry_id, new_position in new_positions.items():
@@ -437,11 +447,11 @@ if admin_password == "))$%17k60ZCS":  # Simple password check
                             success_count += 1
                     
                     if success_count == len(new_positions):
-                        st.sidebar.success(f"✅ Order updated for {success_count} entries! 已更新{success_count}个条目的顺序!")
+                        st.success(f"✅ Order updated for {success_count} entries! 已更新{success_count}个条目的顺序!")
                         time.sleep(2)
                         st.rerun()
                     else:
-                        st.sidebar.error("❌ Some entries failed to update. 部分条目更新失败。")
+                        st.error("❌ Some entries failed to update. 部分条目更新失败。")
         
         # Reset order button
         if st.sidebar.button("Reset to Default Order 重置为默认顺序", key="reset_order"):
