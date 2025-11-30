@@ -96,7 +96,7 @@ def get_all_entries():
 
 
 def get_all_entries_sorted():
-    """Get all entries sorted by manual order, then by timestamp"""
+    """Get all entries sorted by manual order, then by timestamp (newest first)"""
     if db is None:
         return {}
 
@@ -104,15 +104,30 @@ def get_all_entries_sorted():
         entries_ref = db.collection('thankful_entries')
         docs = entries_ref.stream()
 
-        entries = {}
+        manual_ordered = []
+        auto_ordered = []
+        
         for doc in docs:
             entry_data = doc.to_dict()
-            entry_data['firebase_id'] = doc.id  # Store the Firebase document ID
-            entries[doc.id] = entry_data
-
-        # Sort entries: first by manual_order (if exists), then by Firebase ID (chronological)
-        sorted_entries = dict(sorted(entries.items(),
-                                     key=lambda x: (x[1].get('manual_order', 999999), x[0])))
+            entry_data['firebase_id'] = doc.id
+            
+            # Separate entries with manual order from those without
+            if entry_data.get('manual_order') is not None:
+                manual_ordered.append((doc.id, entry_data))
+            else:
+                auto_ordered.append((doc.id, entry_data))
+        
+        # Sort manually ordered entries by their manual_order (ascending)
+        manual_ordered.sort(key=lambda x: x[1].get('manual_order', 999999))
+        
+        # Sort auto entries by timestamp (newest first), fallback to Firebase ID
+        auto_ordered.sort(key=lambda x: x[1].get('timestamp', x[0]), reverse=True)
+        
+        # Combine: manual ordered first, then auto ordered (newest first)
+        sorted_entries = {}
+        for entry_id, entry_data in manual_ordered + auto_ordered:
+            sorted_entries[entry_id] = entry_data
+        
         return sorted_entries
     except Exception as e:
         st.error(f"Error getting sorted entries: {e}")
@@ -130,6 +145,7 @@ def add_single_entry(entry_data):
         # Generate a new document ID
         new_doc_ref = entries_ref.document()
         entry_data['entry_id'] = new_doc_ref.id
+        entry_data['timestamp'] = time.time()  # ADD TIMESTAMP for reliable sorting
         new_doc_ref.set(entry_data)
         return True
     except Exception as e:
@@ -296,7 +312,7 @@ else:
     # Check if manual ordering is being used
     has_manual_order = any(entry.get('manual_order') for entry in entries.values())
     if has_manual_order:
-        st.subheader(f"All Entries (Manual Order) 所有条目 (手动排序)")
+        st.subheader(f"All Entries (Manual Order + Newest First) 所有条目 (手动排序 + 最新优先)")
     else:
         st.subheader(f"All Entries (Newest First) 所有条目 (最新优先)")
 
